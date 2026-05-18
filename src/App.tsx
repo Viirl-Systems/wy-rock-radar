@@ -10,6 +10,7 @@ import {
   Filter,
   Flag,
   Layers,
+  LoaderCircle,
   MapPinned,
   Mountain,
   Navigation,
@@ -33,6 +34,7 @@ import { calculateRockScore, explainScore, getScoreBand, getScoreTone } from './
 import type { FieldLog, Hotspot, LayerToggleState, Material } from './types';
 
 const STORAGE_KEY = 'wy-rock-radar-field-logs';
+const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 
 const WY_BOUNDS = {
   minLat: 40.95,
@@ -46,6 +48,7 @@ const WYOMING_MAX_BOUNDS: [[number, number], [number, number]] = [
   [WY_BOUNDS.minLng - 1, WY_BOUNDS.minLat - 0.75],
   [WY_BOUNDS.maxLng + 1, WY_BOUNDS.maxLat + 0.75],
 ];
+const WYOMING_VIEWBOX = `${WY_BOUNDS.minLng},${WY_BOUNDS.maxLat},${WY_BOUNDS.maxLng},${WY_BOUNDS.minLat}`;
 
 const MAP_STYLE: StyleSpecification = {
   version: 8,
@@ -102,6 +105,19 @@ const initialLayerState: LayerToggleState = {
   notes: true,
 };
 
+type UserLocation = {
+  label: string;
+  lat: number;
+  lng: number;
+  source: 'address' | 'coordinates';
+};
+
+type NominatimSearchResult = {
+  display_name?: string;
+  lat: string;
+  lon: string;
+};
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 }
@@ -121,6 +137,64 @@ function downloadFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function isInsideWyoming(lat: number, lng: number) {
+  return lat >= WY_BOUNDS.minLat && lat <= WY_BOUNDS.maxLat && lng >= WY_BOUNDS.minLng && lng <= WY_BOUNDS.maxLng;
+}
+
+function parseCoordinateSearch(value: string): UserLocation | null {
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+
+  const asLatLng = isInsideWyoming(first, second);
+  const asLngLat = isInsideWyoming(second, first);
+  if (!asLatLng && !asLngLat) return null;
+
+  const lat = asLatLng ? first : second;
+  const lng = asLatLng ? second : first;
+
+  return {
+    label: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+    lat,
+    lng,
+    source: 'coordinates',
+  };
+}
+
+function normalizeWyomingQuery(value: string) {
+  return /\b(wy|wyo|wyoming)\b/i.test(value) ? value : `${value}, Wyoming`;
+}
+
+function shortenLocationLabel(value: string) {
+  const parts = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.slice(0, 3).join(', ') || value;
+}
+
+function getDistanceMiles(from: Pick<UserLocation, 'lat' | 'lng'>, to: Pick<Hotspot, 'lat' | 'lng'>) {
+  const earthRadiusMiles = 3958.8;
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const deltaLat = ((to.lat - from.lat) * Math.PI) / 180;
+  const deltaLng = ((to.lng - from.lng) * Math.PI) / 180;
+  const a =
+    Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMiles * c;
+}
+
+function formatMiles(value: number) {
+  if (value < 10) return `${value.toFixed(1)} mi`;
+  return `${Math.round(value)} mi`;
+}
+
 function readStoredLogs(): FieldLog[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -136,6 +210,11 @@ export default function App() {
   const [accessFilter, setAccessFilter] = useState('All');
   const [minimumScore, setMinimumScore] = useState(45);
   const [query, setQuery] = useState('');
+  const [addressQuery, setAddressQuery] = useState('');
+  const [searchRadiusMiles, setSearchRadiusMiles] = useState(50);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationError, setLocationError] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [layers, setLayers] = useState<LayerToggleState>(initialLayerState);
   const [logs, setLogs] = useState<FieldLog[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -190,6 +269,29 @@ export default function App() {
 
   const selectedLogs = logs.filter((log) => log.hotspotId === selected.hotspot.id);
 
+  const nearestHotspot = useMemo(() => {
+    if (!userLocation) return null;
+
+    return scoredHotspots
+      .map((item) => ({
+        ...item,
+        distanceMiles: getDistanceMiles(userLocation, item.hotspot),
+      }))
+      .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
+  }, [scoredHotspots, userLocation]);
+
+  const hotspotsInsideRadius = useMemo(() => {
+    if (!userLocation) return [];
+
+    return scoredHotspots
+      .map((item) => ({
+        ...item,
+        distanceMiles: getDistanceMiles(userLocation, item.hotspot),
+      }))
+      .filter((item) => item.distanceMiles <= searchRadiusMiles)
+      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+  }, [scoredHotspots, searchRadiusMiles, userLocation]);
+
   const metrics = useMemo(() => {
     const priority = scoredHotspots.filter(({ score, hotspot }) => score >= 80 && hotspot.accessStatus !== 'Restricted / no-go').length;
     const verify = scoredHotspots.filter(({ hotspot }) => hotspot.accessStatus === 'Verify access').length;
@@ -207,6 +309,87 @@ export default function App() {
 
   function toggleLayer(layer: keyof LayerToggleState) {
     setLayers((current) => ({ ...current, [layer]: !current[layer] }));
+  }
+
+  function applyUserLocation(location: UserLocation) {
+    const nearest = scoredHotspots
+      .map((item) => ({
+        ...item,
+        distanceMiles: getDistanceMiles(location, item.hotspot),
+      }))
+      .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
+
+    setUserLocation(location);
+    if (nearest) {
+      setSelectedId(nearest.hotspot.id);
+    }
+  }
+
+  async function locateAddress(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedQuery = addressQuery.trim();
+    if (!trimmedQuery) {
+      setLocationError('Add a Wyoming address, town, or coordinate pair.');
+      return;
+    }
+
+    setIsGeocoding(true);
+    setLocationError('');
+
+    try {
+      const coordinateLocation = parseCoordinateSearch(trimmedQuery);
+      if (coordinateLocation) {
+        applyUserLocation(coordinateLocation);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        addressdetails: '1',
+        bounded: '1',
+        countrycodes: 'us',
+        format: 'jsonv2',
+        limit: '1',
+        q: normalizeWyomingQuery(trimmedQuery),
+        viewbox: WYOMING_VIEWBOX,
+      });
+      const response = await fetch(`${NOMINATIM_SEARCH_URL}?${params.toString()}`, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Geocoder unavailable');
+      }
+
+      const results = (await response.json()) as NominatimSearchResult[];
+      const firstResult = results[0];
+      if (!firstResult) {
+        throw new Error('No Wyoming match found');
+      }
+
+      const lat = Number(firstResult.lat);
+      const lng = Number(firstResult.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !isInsideWyoming(lat, lng)) {
+        throw new Error('No Wyoming match found');
+      }
+
+      applyUserLocation({
+        label: shortenLocationLabel(firstResult.display_name ?? trimmedQuery),
+        lat,
+        lng,
+        source: 'address',
+      });
+    } catch (error) {
+      setUserLocation(null);
+      setLocationError(error instanceof Error ? error.message : 'Location lookup failed');
+    } finally {
+      setIsGeocoding(false);
+    }
+  }
+
+  function clearUserLocation() {
+    setAddressQuery('');
+    setLocationError('');
+    setUserLocation(null);
   }
 
   function addFieldLog(event: FormEvent<HTMLFormElement>) {
@@ -345,6 +528,68 @@ export default function App() {
           />
         </label>
 
+        <section className="filter-block location-block" aria-labelledby="start-address">
+          <div className="section-title">
+            <MapPinned size={15} />
+            <h2 id="start-address">Start Address</h2>
+          </div>
+          <form className="address-form" onSubmit={locateAddress}>
+            <label className="address-field">
+              <span className="sr-only">Wyoming address, town, or coordinates</span>
+              <input
+                value={addressQuery}
+                onChange={(event) => setAddressQuery(event.target.value)}
+                placeholder="Casper, WY or 42.86, -106.31"
+                aria-label="Wyoming address, town, or coordinates"
+              />
+            </label>
+            <label className="radius-field">
+              <span>Radius</span>
+              <select
+                value={searchRadiusMiles}
+                onChange={(event) => setSearchRadiusMiles(Number(event.target.value))}
+                aria-label="Dig search radius"
+              >
+                <option value={10}>10 mi</option>
+                <option value={25}>25 mi</option>
+                <option value={50}>50 mi</option>
+                <option value={75}>75 mi</option>
+                <option value={100}>100 mi</option>
+              </select>
+            </label>
+            <div className="address-actions">
+              <button className="sidebar-button sidebar-button-primary" type="submit" disabled={isGeocoding}>
+                {isGeocoding ? <LoaderCircle className="spin" size={15} /> : <Navigation size={15} />}
+                Center map
+              </button>
+              {userLocation && (
+                <button className="sidebar-button sidebar-button-ghost" type="button" onClick={clearUserLocation}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </form>
+          {locationError && <p className="location-message is-error">{locationError}</p>}
+          {userLocation && nearestHotspot && (
+            <div className="location-result" aria-live="polite">
+              <div className="location-result-header">
+                <strong>{userLocation.label}</strong>
+                <span>{hotspotsInsideRadius.length} in radius</span>
+              </div>
+              <button
+                className="nearest-link"
+                type="button"
+                onClick={() => setSelectedId(nearestHotspot.hotspot.id)}
+              >
+                <span>Nearest candidate</span>
+                <strong>
+                  {nearestHotspot.hotspot.name} · {formatMiles(nearestHotspot.distanceMiles)}
+                </strong>
+              </button>
+            </div>
+          )}
+        </section>
+
         <section className="filter-block" aria-labelledby="target-materials">
           <div className="section-title">
             <Filter size={15} />
@@ -460,6 +705,8 @@ export default function App() {
               filteredHotspots={filteredHotspots.map((item) => item.hotspot)}
               layers={layers}
               selectedId={selected.hotspot.id}
+              userLocation={userLocation}
+              searchRadiusMiles={searchRadiusMiles}
               onSelect={setSelectedId}
             />
 
@@ -694,20 +941,69 @@ function routeLineData(): MapFeatureCollection {
   );
 }
 
+function radiusAreaData(location: UserLocation | null, radiusMiles: number): MapFeatureCollection {
+  if (!location) return featureCollection();
+
+  const earthRadiusMiles = 3958.8;
+  const angularDistance = radiusMiles / earthRadiusMiles;
+  const lat = (location.lat * Math.PI) / 180;
+  const lng = (location.lng * Math.PI) / 180;
+  const points: [number, number][] = [];
+
+  for (let bearingDegrees = 0; bearingDegrees <= 360; bearingDegrees += 4) {
+    const bearing = (bearingDegrees * Math.PI) / 180;
+    const pointLat = Math.asin(
+      Math.sin(lat) * Math.cos(angularDistance) +
+        Math.cos(lat) * Math.sin(angularDistance) * Math.cos(bearing),
+    );
+    const pointLng =
+      lng +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat),
+        Math.cos(angularDistance) - Math.sin(lat) * Math.sin(pointLat),
+      );
+
+    points.push([(pointLng * 180) / Math.PI, (pointLat * 180) / Math.PI]);
+  }
+
+  return featureCollection([
+    {
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [points] },
+      properties: { radiusMiles },
+    },
+  ]);
+}
+
+function radiusBounds(location: UserLocation, radiusMiles: number): [[number, number], [number, number]] {
+  const latDelta = radiusMiles / 69;
+  const lngDelta = radiusMiles / (69 * Math.max(Math.cos((location.lat * Math.PI) / 180), 0.2));
+
+  return [
+    [location.lng - lngDelta, location.lat - latDelta],
+    [location.lng + lngDelta, location.lat + latDelta],
+  ];
+}
+
 function WyomingMap({
   filteredHotspots,
   layers,
   selectedId,
+  userLocation,
+  searchRadiusMiles,
   onSelect,
 }: {
   filteredHotspots: Hotspot[];
   layers: LayerToggleState;
   selectedId: string;
+  userLocation: UserLocation | null;
+  searchRadiusMiles: number;
   onSelect: (id: string) => void;
 }) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const userMarkerRef = useRef<Marker | null>(null);
   const mapReadyRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -755,6 +1051,28 @@ function WyomingMap({
           'line-color': '#223328',
           'line-opacity': 0.52,
           'line-width': 2,
+        },
+      });
+
+      map.addSource('user-radius', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'user-radius-fill',
+        type: 'fill',
+        source: 'user-radius',
+        paint: {
+          'fill-color': '#cf7b48',
+          'fill-opacity': 0.1,
+        },
+      });
+      map.addLayer({
+        id: 'user-radius-line',
+        type: 'line',
+        source: 'user-radius',
+        paint: {
+          'line-color': '#a65231',
+          'line-dasharray': [2, 1.6],
+          'line-opacity': 0.78,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1.2, 8, 2.4],
         },
       });
 
@@ -826,6 +1144,7 @@ function WyomingMap({
 
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
+      userMarkerRef.current?.remove();
       map.remove();
       mapReadyRef.current = false;
       setMapReady(false);
@@ -911,6 +1230,41 @@ function WyomingMap({
       zoom: Math.max(map.getZoom(), 6.45),
     });
   }, [mapReady, selectedHotspot]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    setSourceData(map, 'user-radius', radiusAreaData(userLocation, searchRadiusMiles));
+  }, [mapReady, searchRadiusMiles, userLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = null;
+
+    if (!userLocation) return;
+
+    const element = document.createElement('div');
+    element.className = 'map-origin-marker';
+    element.setAttribute('role', 'img');
+    element.setAttribute('aria-label', `Start address: ${userLocation.label}`);
+    element.title = userLocation.label;
+    element.innerHTML = '<span></span>';
+
+    userMarkerRef.current = new maplibregl.Marker({ anchor: 'bottom', element, offset: [0, -6] })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .addTo(map);
+
+    map.fitBounds(radiusBounds(userLocation, searchRadiusMiles), {
+      duration: 700,
+      essential: true,
+      maxZoom: 8.8,
+      padding: { bottom: 86, left: 72, right: 72, top: 72 },
+    });
+  }, [mapReady, searchRadiusMiles, userLocation]);
 
   return (
     <div className="map-canvas">
