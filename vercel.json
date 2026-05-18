@@ -6,7 +6,7 @@
     }
   ],
   "functions": {
-    "api/rockhounding-sync.mjs": {
+    "api/rockhounding-sync.js": {
       "includeFiles": "src/data/rockhounding-wyoming-baseline.json",
       "maxDuration": 10
     }

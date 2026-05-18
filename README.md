@@ -134,7 +134,7 @@ Important files:
 - `src/scoring.ts`: scoring model and score-band logic
 - `src/App.tsx`: dashboard UI, map prototype, filters, field logs, exports
 - `src/styles.css`: full visual system and responsive layout
-- `api/rockhounding-sync.mjs`: Vercel cron-compatible source monitor
+- `api/rockhounding-sync.js`: Vercel cron-compatible source monitor
 - `vercel.json`: daily Vercel cron schedule
 
 The project is ready to hand to Gwen as a working product prototype plus a clear path to real GIS-grade data.
