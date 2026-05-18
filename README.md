@@ -5,6 +5,7 @@ WY Rock Radar is a personal Wyoming rockhounding research dashboard. It helps Gw
 This is intentionally built as a free, handoff-ready MVP:
 
 - React + Vite frontend
+- MapLibre map canvas with free OpenStreetMap raster tiles
 - No paid map key
 - No backend
 - Local browser field logs

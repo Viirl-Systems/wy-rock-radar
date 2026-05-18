@@ -20,7 +20,14 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import maplibregl, {
+  type GeoJSONSource,
+  type Map as MapLibreMap,
+  type Marker,
+  type StyleSpecification,
+} from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { DATA_SOURCES, HOTSPOTS, MATERIALS } from './data';
 import { calculateRockScore, explainScore, getScoreBand, getScoreTone } from './scoring';
 import type { FieldLog, Hotspot, LayerToggleState, Material } from './types';
@@ -34,92 +41,37 @@ const WY_BOUNDS = {
   maxLng: -104.02,
 };
 
-const GEOLOGY_AREAS = [
-  {
-    id: 'basin-silica',
-    label: 'Basin silica / terrace search',
-    tone: 'sage',
-    points: [
-      [-110.7, 41.25],
-      [-108.1, 41.15],
-      [-107.1, 42.12],
-      [-108.4, 42.9],
-      [-110.2, 42.58],
-    ],
-  },
-  {
-    id: 'crystalline-core',
-    label: 'Crystalline uplift context',
-    tone: 'violet',
-    points: [
-      [-109.2, 42.05],
-      [-107.7, 42.12],
-      [-107.08, 43.05],
-      [-108.58, 43.46],
-      [-109.55, 42.82],
-    ],
-  },
-  {
-    id: 'northern-uplift',
-    label: 'Foothill quartz windows',
-    tone: 'blue',
-    points: [
-      [-108.7, 43.62],
-      [-106.92, 43.7],
-      [-106.32, 44.52],
-      [-108.15, 44.78],
-      [-109.0, 44.28],
-    ],
-  },
-  {
-    id: 'east-private-risk',
-    label: 'Access-constrained research',
-    tone: 'copper',
-    points: [
-      [-105.55, 41.35],
-      [-104.42, 41.38],
-      [-104.33, 43.12],
-      [-105.8, 43.02],
-      [-106.18, 42.06],
-    ],
-  },
+const WYOMING_CENTER: [number, number] = [-107.55, 42.92];
+const WYOMING_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [WY_BOUNDS.minLng - 1, WY_BOUNDS.minLat - 0.75],
+  [WY_BOUNDS.maxLng + 1, WY_BOUNDS.maxLat + 0.75],
 ];
 
-const PUBLIC_LAND_AREAS = [
-  [
-    [-110.92, 41.18],
-    [-108.0, 41.18],
-    [-108.16, 42.42],
-    [-110.52, 42.34],
+const MAP_STYLE: StyleSpecification = {
+  version: 8,
+  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'osm',
+      type: 'raster',
+      source: 'osm',
+      paint: {
+        'raster-saturation': -0.42,
+        'raster-contrast': -0.08,
+        'raster-brightness-min': 0.12,
+        'raster-brightness-max': 0.93,
+      },
+    },
   ],
-  [
-    [-108.52, 41.55],
-    [-106.02, 41.52],
-    [-106.24, 42.6],
-    [-108.1, 42.7],
-  ],
-  [
-    [-107.22, 43.28],
-    [-105.32, 43.14],
-    [-105.62, 44.2],
-    [-107.46, 44.1],
-  ],
-];
-
-const CLAIM_AREAS = [
-  [
-    [-109.24, 42.08],
-    [-108.36, 42.04],
-    [-108.44, 42.68],
-    [-109.08, 42.72],
-  ],
-  [
-    [-107.08, 41.92],
-    [-106.54, 41.98],
-    [-106.58, 42.38],
-    [-107.2, 42.3],
-  ],
-];
+};
 
 const ROAD_LINES = [
   [
@@ -149,29 +101,6 @@ const initialLayerState: LayerToggleState = {
   roads: true,
   notes: true,
 };
-
-function projectPoint(lng: number, lat: number) {
-  const x = ((lng - WY_BOUNDS.minLng) / (WY_BOUNDS.maxLng - WY_BOUNDS.minLng)) * 1000;
-  const y = (1 - (lat - WY_BOUNDS.minLat) / (WY_BOUNDS.maxLat - WY_BOUNDS.minLat)) * 660;
-
-  return { x, y };
-}
-
-function polygonPoints(points: number[][]) {
-  return points.map(([lng, lat]) => {
-    const { x, y } = projectPoint(lng, lat);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-}
-
-function pathFromLine(points: number[][]) {
-  return points
-    .map(([lng, lat], index) => {
-      const { x, y } = projectPoint(lng, lat);
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
@@ -545,10 +474,10 @@ export default function App() {
                 <i className="legend-dot watch" /> Research
               </span>
               <span>
-                <i className="legend-line" /> Roads
+                <i className="legend-ring access" /> Public access
               </span>
               <span>
-                <i className="legend-claim" /> Claim risk
+                <i className="legend-ring claim" /> Claim risk
               </span>
             </div>
           </section>
@@ -679,6 +608,92 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
   );
 }
 
+type MapFeatureProperties = Record<string, string | number | boolean | null>;
+type MapFeature =
+  | {
+      type: 'Feature';
+      geometry: { type: 'Point'; coordinates: [number, number] };
+      properties: MapFeatureProperties;
+    }
+  | {
+      type: 'Feature';
+      geometry: { type: 'LineString'; coordinates: number[][] };
+      properties: MapFeatureProperties;
+    }
+  | {
+      type: 'Feature';
+      geometry: { type: 'Polygon'; coordinates: number[][][] };
+      properties: MapFeatureProperties;
+    };
+type MapFeatureCollection = { type: 'FeatureCollection'; features: MapFeature[] };
+
+function featureCollection(features: MapFeature[] = []): MapFeatureCollection {
+  return { type: 'FeatureCollection', features };
+}
+
+function getMarkerTone(hotspot: Hotspot, score: number) {
+  return hotspot.accessStatus === 'Restricted / no-go' ? 'blocked' : getScoreTone(score);
+}
+
+function buildHotspotFeature(hotspot: Hotspot, extra: MapFeatureProperties = {}): MapFeature {
+  const score = calculateRockScore(hotspot.scoreFactors);
+  return {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [hotspot.lng, hotspot.lat] },
+    properties: {
+      id: hotspot.id,
+      name: hotspot.name,
+      score,
+      tone: getMarkerTone(hotspot, score),
+      ...extra,
+    },
+  };
+}
+
+function setSourceData(map: MapLibreMap, sourceId: string, data: MapFeatureCollection) {
+  const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+  source?.setData(data as Parameters<GeoJSONSource['setData']>[0]);
+}
+
+function setLayerVisibility(map: MapLibreMap, layerIds: string[], visible: boolean) {
+  layerIds.forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+    }
+  });
+}
+
+function wyomingFrameData(): MapFeatureCollection {
+  return featureCollection([
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [WY_BOUNDS.minLng, WY_BOUNDS.minLat],
+            [WY_BOUNDS.maxLng, WY_BOUNDS.minLat],
+            [WY_BOUNDS.maxLng, WY_BOUNDS.maxLat],
+            [WY_BOUNDS.minLng, WY_BOUNDS.maxLat],
+            [WY_BOUNDS.minLng, WY_BOUNDS.minLat],
+          ],
+        ],
+      },
+      properties: {},
+    },
+  ]);
+}
+
+function routeLineData(): MapFeatureCollection {
+  return featureCollection(
+    ROAD_LINES.map((line, index) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: line },
+      properties: { id: `research-route-${index + 1}` },
+    })),
+  );
+}
+
 function WyomingMap({
   filteredHotspots,
   layers,
@@ -690,93 +705,220 @@ function WyomingMap({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
-  const visibleIds = new Set(filteredHotspots.map((hotspot) => hotspot.id));
+  const mapNodeRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markersRef = useRef<Marker[]>([]);
+  const mapReadyRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
+
+  const visibleIds = useMemo(() => new Set(filteredHotspots.map((hotspot) => hotspot.id)), [filteredHotspots]);
+  const selectedHotspot = useMemo(
+    () => HOTSPOTS.find((hotspot) => hotspot.id === selectedId) ?? HOTSPOTS[0],
+    [selectedId],
+  );
+
+  useEffect(() => {
+    if (!mapNodeRef.current || mapRef.current) return;
+
+    const map = new maplibregl.Map({
+      attributionControl: false,
+      center: WYOMING_CENTER,
+      container: mapNodeRef.current,
+      dragRotate: false,
+      maxBounds: WYOMING_MAX_BOUNDS,
+      maxZoom: 11,
+      minZoom: 5,
+      pitchWithRotate: false,
+      style: MAP_STYLE,
+      zoom: 6,
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+    map.on('load', () => {
+      map.addSource('wyoming-frame', { type: 'geojson', data: wyomingFrameData() });
+      map.addLayer({
+        id: 'wyoming-frame-fill',
+        type: 'fill',
+        source: 'wyoming-frame',
+        paint: {
+          'fill-color': '#fff8ea',
+          'fill-opacity': 0.07,
+        },
+      });
+      map.addLayer({
+        id: 'wyoming-frame-line',
+        type: 'line',
+        source: 'wyoming-frame',
+        paint: {
+          'line-color': '#223328',
+          'line-opacity': 0.52,
+          'line-width': 2,
+        },
+      });
+
+      map.addSource('geology-signal', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'geology-signal',
+        type: 'circle',
+        source: 'geology-signal',
+        paint: {
+          'circle-blur': 0.35,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.18,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 18, 8, 56],
+          'circle-stroke-color': ['get', 'stroke'],
+          'circle-stroke-opacity': 0.42,
+          'circle-stroke-width': 1.5,
+        },
+      });
+
+      map.addSource('access-signal', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'access-signal',
+        type: 'circle',
+        source: 'access-signal',
+        paint: {
+          'circle-color': '#5f8165',
+          'circle-opacity': 0.1,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 14, 8, 42],
+          'circle-stroke-color': '#5f8165',
+          'circle-stroke-opacity': 0.42,
+          'circle-stroke-width': 1.2,
+        },
+      });
+
+      map.addSource('claim-signal', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'claim-signal',
+        type: 'circle',
+        source: 'claim-signal',
+        paint: {
+          'circle-color': '#8b3030',
+          'circle-opacity': 0.08,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 16, 8, 46],
+          'circle-stroke-color': '#8b3030',
+          'circle-stroke-opacity': 0.52,
+          'circle-stroke-width': 1.4,
+        },
+      });
+
+      map.addSource('research-routes', { type: 'geojson', data: routeLineData() });
+      map.addLayer({
+        id: 'research-routes',
+        type: 'line',
+        source: 'research-routes',
+        paint: {
+          'line-color': '#6c756b',
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.6,
+          'line-width': 2.2,
+        },
+      });
+
+      mapReadyRef.current = true;
+      setMapReady(true);
+      map.resize();
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      markersRef.current.forEach((marker) => marker.remove());
+      map.remove();
+      mapReadyRef.current = false;
+      setMapReady(false);
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    setSourceData(
+      map,
+      'geology-signal',
+      featureCollection(
+        filteredHotspots.map((hotspot) =>
+          buildHotspotFeature(hotspot, {
+            color: hotspot.targetMaterials.includes('Jade')
+              ? '#5f8165'
+              : hotspot.targetMaterials.includes('Petrified wood')
+                ? '#b45f35'
+                : '#45738f',
+            stroke: hotspot.targetMaterials.includes('Jade') ? '#3c6145' : '#4f6e80',
+          }),
+        ),
+      ),
+    );
+    setSourceData(
+      map,
+      'access-signal',
+      featureCollection(
+        filteredHotspots
+          .filter((hotspot) => hotspot.accessStatus === 'Likely public')
+          .map((hotspot) => buildHotspotFeature(hotspot)),
+      ),
+    );
+    setSourceData(
+      map,
+      'claim-signal',
+      featureCollection(
+        filteredHotspots
+          .filter((hotspot) => hotspot.claimRisk === 'High' || hotspot.claimRisk === 'Medium')
+          .map((hotspot) => buildHotspotFeature(hotspot)),
+      ),
+    );
+
+    setLayerVisibility(map, ['geology-signal'], layers.geology);
+    setLayerVisibility(map, ['access-signal'], layers.publicLand);
+    setLayerVisibility(map, ['claim-signal'], layers.claims);
+    setLayerVisibility(map, ['research-routes'], layers.roads);
+  }, [filteredHotspots, layers, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = filteredHotspots.map((hotspot) => {
+      const score = calculateRockScore(hotspot.scoreFactors);
+      const tone = getMarkerTone(hotspot, score);
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.className = `map-score-marker ${tone} ${hotspot.id === selectedId ? 'is-selected' : ''}`;
+      element.setAttribute('aria-label', `Select ${hotspot.name}, rock score ${score}`);
+      element.title = `${hotspot.name} · ${score}`;
+      element.innerHTML = `<span>${score}</span>`;
+      element.addEventListener('click', () => onSelect(hotspot.id));
+
+      return new maplibregl.Marker({ anchor: 'bottom', element, offset: [0, -4] })
+        .setLngLat([hotspot.lng, hotspot.lat])
+        .addTo(map);
+    });
+  }, [filteredHotspots, mapReady, onSelect, selectedId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    map.easeTo({
+      center: [selectedHotspot.lng, selectedHotspot.lat],
+      duration: 650,
+      essential: true,
+      zoom: Math.max(map.getZoom(), 6.45),
+    });
+  }, [mapReady, selectedHotspot]);
 
   return (
     <div className="map-canvas">
-      <svg viewBox="0 0 1000 660" role="img" aria-label="Wyoming candidate hotspot map">
-        <defs>
-          <pattern id="grid" width="46" height="46" patternUnits="userSpaceOnUse">
-            <path d="M 46 0 L 0 0 0 46" fill="none" stroke="rgba(40, 54, 45, .08)" strokeWidth="1" />
-          </pattern>
-          <filter id="pinShadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="7" stdDeviation="6" floodColor="#0f1712" floodOpacity="0.23" />
-          </filter>
-        </defs>
-
-        <rect width="1000" height="660" rx="18" fill="#eff1e7" />
-        <rect width="1000" height="660" fill="url(#grid)" />
-        <path
-          d="M 35 32 L 964 22 L 956 628 L 44 620 Z"
-          fill="#f8f3e8"
-          stroke="#34443b"
-          strokeWidth="3"
-        />
-        <path
-          d="M 35 32 L 964 22 L 956 628 L 44 620 Z"
-          fill="none"
-          stroke="rgba(255,255,255,.65)"
-          strokeWidth="7"
-        />
-
-        {layers.geology &&
-          GEOLOGY_AREAS.map((area) => (
-            <g key={area.id}>
-              <polygon className={`geo-area ${area.tone}`} points={polygonPoints(area.points).join(' ')} />
-              <text className="map-label" x={polygonPoints(area.points)[0].split(',')[0]} y={polygonPoints(area.points)[0].split(',')[1]}>
-                {area.label}
-              </text>
-            </g>
-          ))}
-
-        {layers.publicLand &&
-          PUBLIC_LAND_AREAS.map((area, index) => (
-            <polygon key={index} className="public-land-area" points={polygonPoints(area).join(' ')} />
-          ))}
-
-        {layers.claims &&
-          CLAIM_AREAS.map((area, index) => (
-            <polygon key={index} className="claim-area" points={polygonPoints(area).join(' ')} />
-          ))}
-
-        {layers.roads &&
-          ROAD_LINES.map((line, index) => (
-            <path key={index} className="road-line" d={pathFromLine(line)} />
-          ))}
-
-        {HOTSPOTS.map((hotspot) => {
-          const point = projectPoint(hotspot.lng, hotspot.lat);
-          const score = calculateRockScore(hotspot.scoreFactors);
-          const tone = hotspot.accessStatus === 'Restricted / no-go' ? 'blocked' : getScoreTone(score);
-          const visible = visibleIds.has(hotspot.id);
-          const isSelected = hotspot.id === selectedId;
-
-          return (
-            <g
-              key={hotspot.id}
-              className={`map-pin ${tone} ${visible ? '' : 'is-muted'} ${isSelected ? 'is-selected' : ''}`}
-              filter="url(#pinShadow)"
-              onClick={() => onSelect(hotspot.id)}
-              tabIndex={0}
-              role="button"
-              aria-label={`Select ${hotspot.name}`}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') onSelect(hotspot.id);
-              }}
-            >
-              <circle cx={point.x} cy={point.y} r={isSelected ? 18 : 13} />
-              <circle cx={point.x} cy={point.y} r="5" className="pin-core" />
-              <text x={point.x + 18} y={point.y - 18}>
-                {score}
-              </text>
-            </g>
-          );
-        })}
-
-        <text x="62" y="594" className="state-label">
-          WYOMING
-        </text>
-      </svg>
+      <div ref={mapNodeRef} className="maplibre-host" aria-label="Interactive Wyoming candidate hotspot map" />
+      <div className="map-status-strip" aria-hidden="true">
+        <span>Interactive Wyoming basemap</span>
+        <span>{visibleIds.size} filtered targets</span>
+      </div>
     </div>
   );
 }
