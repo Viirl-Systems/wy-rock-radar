@@ -4,8 +4,39 @@ export type Material =
   | 'Jade'
   | 'Petrified wood'
   | 'Quartz'
-  | 'Fossil caution'
+  | 'Quartz crystals'
+  | 'Chalcedony'
+  | 'Common opal'
+  | 'Chert / flint'
+  | 'Geodes / nodules'
   | 'Gold indicators'
+  | 'Diamond indicators'
+  | 'Kimberlite / lamproite'
+  | 'Garnet'
+  | 'Chromian diopside'
+  | 'Picroilmenite / ilmenite'
+  | 'Magnetite / hematite'
+  | 'Copper minerals'
+  | 'Malachite / azurite'
+  | 'Pyrite / chalcopyrite'
+  | 'Feldspar / pegmatite'
+  | 'Beryl / mica'
+  | 'Amazonite'
+  | 'Tourmaline'
+  | 'Moonstone / labradorite'
+  | 'Calcite'
+  | 'Aragonite'
+  | 'Barite'
+  | 'Fluorite'
+  | 'Kyanite'
+  | 'Corundum / sapphire'
+  | 'Gypsum / selenite'
+  | 'Travertine / onyx marble'
+  | 'Alabaster'
+  | 'Bloodstone'
+  | 'Obsidian'
+  | 'Fossil caution'
+  | 'Uranium caution'
   | 'Unusual minerals';
 
 export type AccessStatus = 'Likely public' | 'Verify access' | 'Private risk' | 'Restricted / no-go';
@@ -41,6 +72,17 @@ export interface Hotspot {
   cautions: string[];
   sourceNotes: string[];
   scoreFactors: ScoreFactors;
+}
+
+export interface CommunityReferenceLocation {
+  id: string;
+  slug: string;
+  name: string;
+  lat: number;
+  lng: number;
+  locationType: string;
+  foundHere: string[];
+  sourceUrl: string;
 }
 
 export interface FieldLog {
@@ -104,5 +146,6 @@ export interface LayerToggleState {
   publicLand: boolean;
   claims: boolean;
   roads: boolean;
+  communitySites: boolean;
   notes: boolean;
 }

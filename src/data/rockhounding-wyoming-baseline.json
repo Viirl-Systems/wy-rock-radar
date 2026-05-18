@@ -1,0 +1,1134 @@
+{
+  "sourceName": "Rockhounding.org Wyoming map",
+  "sourceUrl": "https://rockhounding.org/maps/us/wyoming",
+  "capturedAt": "2026-05-18T23:02:24.841Z",
+  "note": "Community-submitted reference data. Verify coordinates, ownership, claim status, and collecting rules before field use.",
+  "locations": [
+    {
+      "id": "0d3fc9ac-a3cf-4260-a01f-fc273ae6f5c7",
+      "slug": "atlantic-city",
+      "name": "Atlantic City",
+      "lat": 42.48946,
+      "lng": -108.727541,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Gold",
+        "Nephrite jade",
+        "Jade",
+        "Jasper",
+        "Muscovite",
+        "Quartz crystals",
+        "Agatized wood",
+        "Opalized wood",
+        "Tourmaline"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/atlantic-city"
+    },
+    {
+      "id": "dfb89830-2cea-4e47-b12f-ab2aee10f761",
+      "slug": "baggs",
+      "name": "Baggs",
+      "lat": 41.089395,
+      "lng": -107.593709,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Coffinite",
+        "Ilsemannite",
+        "Autunite",
+        "Pyrite",
+        "Uranophane",
+        "Uraninite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/baggs"
+    },
+    {
+      "id": "e55fd00d-9634-4913-97f3-f136f5e6f2dd",
+      "slug": "big-horn-river",
+      "name": "Big Horn River",
+      "lat": 44.964342,
+      "lng": -108.250897,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Concretions",
+        "Dry Head Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/big-horn-river"
+    },
+    {
+      "id": "603718cc-4c5d-4e4b-8dd8-34485288f2eb",
+      "slug": "bitter-creek",
+      "name": "Bitter Creek",
+      "lat": 41.544321,
+      "lng": -108.546387,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Stechemigite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/bitter-creek"
+    },
+    {
+      "id": "5b5fb322-63f1-41b1-9d98-96e051d1fbad",
+      "slug": "black-hills-national-forest",
+      "name": "Black Hills National Forest",
+      "lat": 44.364122,
+      "lng": -104.065512,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Fluorite",
+        "Gold"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/black-hills-national-forest"
+    },
+    {
+      "id": "987d0e5b-6ea7-4101-a8c7-b0cfabf60a4e",
+      "slug": "blacks-fork-creek",
+      "name": "Blacks Fork Creek",
+      "lat": 41.568326,
+      "lng": -110.141358,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Silicified algae",
+        "Turritella Agate",
+        "Chalcedony",
+        "Jasper",
+        "Quartz crystals",
+        "Petrified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/blacks-fork-creek"
+    },
+    {
+      "id": "f6cb1faa-bd5a-4829-8ec7-4eb7df4a901e",
+      "slug": "box-elder-canyon",
+      "name": "Box Elder Canyon",
+      "lat": 42.769649,
+      "lng": -105.772654,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Geodes",
+        "Quartz crystals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/box-elder-canyon"
+    },
+    {
+      "id": "24bf96ba-1640-436a-8235-c620e7b10096",
+      "slug": "buffalo-wy",
+      "name": "Buffalo",
+      "lat": 44.452728,
+      "lng": -106.554817,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Gastroliths",
+        "Jasper",
+        "Petrified wood",
+        "Quartz crystals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/buffalo-wy"
+    },
+    {
+      "id": "0bb3360e-c4ef-4569-b592-153f41fa65ac",
+      "slug": "casper-1",
+      "name": "Casper",
+      "lat": 42.862272,
+      "lng": -106.285367,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Alabaster",
+        "Amazonite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/casper-1"
+    },
+    {
+      "id": "9614da81-ffd0-4e73-b876-fe9d64822487",
+      "slug": "casper-2",
+      "name": "Casper",
+      "lat": 42.714052,
+      "lng": -106.255972,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Beryl",
+        "Muscovite",
+        "Tourmaline"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/casper-2"
+    },
+    {
+      "id": "a2f62e98-6cab-47b3-8947-a9b916a780f3",
+      "slug": "cedar-mountain",
+      "name": "Cedar Mountain",
+      "lat": 44.489678,
+      "lng": -109.126296,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Travertine"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/cedar-mountain"
+    },
+    {
+      "id": "baab032b-18c2-480a-9213-3e479cf8cd24",
+      "slug": "chugwater-creek",
+      "name": "Chugwater Creek",
+      "lat": 41.620206,
+      "lng": -105.128664,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Bloodstone"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/chugwater-creek"
+    },
+    {
+      "id": "747d1f99-f977-480f-800e-b09b3c867c09",
+      "slug": "como-ridge",
+      "name": "Como Ridge",
+      "lat": 41.87524,
+      "lng": -106.074634,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Petrified dinosaur bones"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/como-ridge"
+    },
+    {
+      "id": "158f531b-7e24-4a79-b61c-67dabf5dc41b",
+      "slug": "converse-county",
+      "name": "Converse County",
+      "lat": 42.493826,
+      "lng": -105.786964,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Copper minerals",
+        "Chalcopyrite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/converse-county"
+    },
+    {
+      "id": "71612f8d-3dbb-4b20-ac75-520cc7705e0b",
+      "slug": "cooney-hills",
+      "name": "Cooney Hills",
+      "lat": 41.981594,
+      "lng": -105.113828,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Garnet"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/cooney-hills"
+    },
+    {
+      "id": "801c2759-1ee2-4369-82b3-b345e5a57772",
+      "slug": "copper-king-mine-wy",
+      "name": "Copper King Mine",
+      "lat": 41.144945,
+      "lng": -105.186005,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Barite",
+        "Copper minerals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/copper-king-mine-wy"
+    },
+    {
+      "id": "060f118e-c77d-43dc-80b1-8534746734e5",
+      "slug": "copper-mountain",
+      "name": "Copper Mountain",
+      "lat": 43.379931,
+      "lng": -107.884276,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Uranium minerals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/copper-mountain"
+    },
+    {
+      "id": "e852f635-9d51-4c2d-a944-d7e8bd89046e",
+      "slug": "copper-prince-mine",
+      "name": "Copper Prince Mine",
+      "lat": 44.482754,
+      "lng": -104.493911,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Chrysocolla",
+        "Gold",
+        "Malachite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/copper-prince-mine"
+    },
+    {
+      "id": "15c6566a-b0f1-4339-9cc6-f8db831c4edf",
+      "slug": "crazy-woman-creek",
+      "name": "Crazy Woman Creek",
+      "lat": 44.254779,
+      "lng": -106.426279,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Opalized wood",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/crazy-woman-creek"
+    },
+    {
+      "id": "b34026c2-427a-447f-9b60-a19b3d6d3892",
+      "slug": "creede-mine",
+      "name": "Creede Mine",
+      "lat": 41.19271,
+      "lng": -107.050348,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Cobaltite",
+        "Erythrite",
+        "Linnaeite",
+        "Pyrrhotite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/creede-mine"
+    },
+    {
+      "id": "e8bc33bc-9563-445d-81ba-65ffb29736f9",
+      "slug": "deer-creek-canyon-mine",
+      "name": "Deer Creek Canyon Mine",
+      "lat": 42.67272,
+      "lng": -106.041144,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Chromite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/deer-creek-canyon-mine"
+    },
+    {
+      "id": "8fbdb875-ec27-494b-9a77-3afd1be3e591",
+      "slug": "eden-valley",
+      "name": "Eden Valley",
+      "lat": 42.02912,
+      "lng": -109.540508,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/eden-valley"
+    },
+    {
+      "id": "e3ec116b-b12d-4d18-92bc-7732348216de",
+      "slug": "farson",
+      "name": "Farson",
+      "lat": 42.16939,
+      "lng": -109.431086,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Chert",
+        "Jasper",
+        "Quartz crystals",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/farson"
+    },
+    {
+      "id": "d1ff1076-8f4f-46a8-a160-0a65957fd9a9",
+      "slug": "fort-bridger",
+      "name": "Fort Bridger",
+      "lat": 41.332944,
+      "lng": -110.371167,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Jasper",
+        "Silicified agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/fort-bridger"
+    },
+    {
+      "id": "bae0f1c1-8df9-4ba9-b9f5-1b783cd99d5c",
+      "slug": "fort-washakie",
+      "name": "Fort Washakie",
+      "lat": 43.131821,
+      "lng": -108.97879,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Moss Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/fort-washakie"
+    },
+    {
+      "id": "cf161a71-685d-4a75-92f1-54a259ccdbb3",
+      "slug": "fremont-county-1",
+      "name": "Fremont County",
+      "lat": 42.537749,
+      "lng": -108.940563,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/fremont-county-1"
+    },
+    {
+      "id": "99e27e2c-e62e-486b-aae3-11fb457ac231",
+      "slug": "fremont-county-2",
+      "name": "Fremont County",
+      "lat": 42.320381,
+      "lng": -107.534465,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Sweetwater Agate",
+        "Nephrite jade",
+        "Jade"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/fremont-county-2"
+    },
+    {
+      "id": "5656aff7-5768-45e3-a2e7-2c511c0c6f49",
+      "slug": "grand-encampment",
+      "name": "Grand Encampment",
+      "lat": 41.156561,
+      "lng": -106.937264,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Azurite",
+        "Malachite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/grand-encampment"
+    },
+    {
+      "id": "899f43f1-a475-4fc9-be1e-66aac381d40e",
+      "slug": "granger",
+      "name": "Granger",
+      "lat": 41.569078,
+      "lng": -109.934802,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Turritella Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/granger"
+    },
+    {
+      "id": "a443646a-05c3-4afe-9d7f-b3918b85e2a1",
+      "slug": "granite-mountains",
+      "name": "Granite Mountains",
+      "lat": 42.471741,
+      "lng": -107.17959,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Chalcedony"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/granite-mountains"
+    },
+    {
+      "id": "0b2663e9-8def-4c61-9758-e85c004b0a4f",
+      "slug": "green-mountain",
+      "name": "Green Mountain",
+      "lat": 42.357364,
+      "lng": -107.723649,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Banded Agate",
+        "Moss Agate",
+        "Aventurine",
+        "Garnet",
+        "Sapphire"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/green-mountain"
+    },
+    {
+      "id": "ad12f46b-85dd-4542-ab95-87f7ad225a78",
+      "slug": "green-river",
+      "name": "Green River",
+      "lat": 41.516726,
+      "lng": -109.712376,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/green-river"
+    },
+    {
+      "id": "851feb44-7e0f-4b3b-985f-df2585184771",
+      "slug": "greybull",
+      "name": "Greybull",
+      "lat": 44.646475,
+      "lng": -107.806988,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gastroliths",
+        "Petrified dinosaur bones",
+        "Fossils"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/greybull"
+    },
+    {
+      "id": "e51645e6-edaa-4414-b0bc-0e90de274bd6",
+      "slug": "hartville",
+      "name": "Hartville",
+      "lat": 42.322134,
+      "lng": -104.748175,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Moss Agate",
+        "Chalcedony"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/hartville"
+    },
+    {
+      "id": "cb831679-8648-4bbd-a5db-18084d67c888",
+      "slug": "hyattville",
+      "name": "Hyattville",
+      "lat": 44.244134,
+      "lng": -107.525982,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum",
+        "Dinosaur bones",
+        "Gastroliths",
+        "Fossils"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/hyattville"
+    },
+    {
+      "id": "b24f1c27-f9b3-41df-b5b5-fb94c15471e3",
+      "slug": "jay-em",
+      "name": "Jay Em",
+      "lat": 42.464002,
+      "lng": -104.363635,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Malachite",
+        "Onyx"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/jay-em"
+    },
+    {
+      "id": "dae6f52c-9b96-4650-adb6-895f8083966d",
+      "slug": "jelm-mountain",
+      "name": "Jelm Mountain",
+      "lat": 41.076125,
+      "lng": -105.991483,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Bismutite",
+        "Bismuth"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/jelm-mountain"
+    },
+    {
+      "id": "17dc3ed2-c534-41df-9209-2bf858894a2b",
+      "slug": "kemmerer",
+      "name": "Kemmerer",
+      "lat": 41.811368,
+      "lng": -110.477977,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Turritella Agate",
+        "Chalcedony",
+        "Chert",
+        "Jasper",
+        "Quartz crystals",
+        "Petrified wood",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/kemmerer"
+    },
+    {
+      "id": "3f1680b1-9a4f-40d6-85da-c7b40ce22804",
+      "slug": "kirwin-mine",
+      "name": "Kirwin Mine",
+      "lat": 43.874552,
+      "lng": -109.284826,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Azurite",
+        "Barite",
+        "Chalcopyrite",
+        "Cuprite",
+        "Galena",
+        "Gold",
+        "Limonite",
+        "Malachite",
+        "Pyrite",
+        "Quartz crystals",
+        "Sphalerite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/kirwin-mine"
+    },
+    {
+      "id": "d49a9699-95ab-4b63-a7d3-00460a74b25c",
+      "slug": "lander",
+      "name": "Lander",
+      "lat": 42.823425,
+      "lng": -108.79258,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Jasper",
+        "Nephrite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/lander"
+    },
+    {
+      "id": "d61fdfe8-cc31-4845-8d86-d04e4dd14d2c",
+      "slug": "laramie",
+      "name": "Laramie",
+      "lat": 41.361527,
+      "lng": -105.517408,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/laramie"
+    },
+    {
+      "id": "9157cd3c-0fc9-4fb9-b3af-6c392f790c8b",
+      "slug": "laramie-mountains",
+      "name": "Laramie Mountains",
+      "lat": 41.573254,
+      "lng": -105.500869,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/laramie-mountains"
+    },
+    {
+      "id": "cc8ef544-5258-415f-b143-732f4af9b826",
+      "slug": "lovell-1",
+      "name": "Lovell",
+      "lat": 44.764671,
+      "lng": -108.20566,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum",
+        "Fossils"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/lovell-1"
+    },
+    {
+      "id": "2d3e279b-0a13-419a-8ae7-b9c90a7c5f7f",
+      "slug": "lovell-2",
+      "name": "Lovell",
+      "lat": 44.797699,
+      "lng": -108.047366,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Fossils",
+        "Ammonites",
+        "Dinosaur bones",
+        "Gastroliths"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/lovell-2"
+    },
+    {
+      "id": "53f17ef5-acb5-4c59-91b3-b1faeee607ea",
+      "slug": "meeteetse",
+      "name": "Meeteetse",
+      "lat": 44.136287,
+      "lng": -108.895881,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/meeteetse"
+    },
+    {
+      "id": "61cd6a80-dd16-4044-b937-7b1ab40fee72",
+      "slug": "moss-agate-hill",
+      "name": "Moss Agate Hill",
+      "lat": 42.640508,
+      "lng": -105.684832,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Moss Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/moss-agate-hill"
+    },
+    {
+      "id": "d1acc7c3-3249-409c-968c-80bf03b69d94",
+      "slug": "newcastle",
+      "name": "Newcastle",
+      "lat": 43.818826,
+      "lng": -104.110072,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/newcastle"
+    },
+    {
+      "id": "d95525ea-ebe1-474b-9efe-02a837e7ff4f",
+      "slug": "owl-creek",
+      "name": "Owl Creek",
+      "lat": 43.711042,
+      "lng": -109.195615,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gold"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/owl-creek"
+    },
+    {
+      "id": "fd256adc-23ec-4676-bdbc-71d68d509164",
+      "slug": "poison-spider-creek",
+      "name": "Poison Spider Creek",
+      "lat": 42.820194,
+      "lng": -106.563539,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/poison-spider-creek"
+    },
+    {
+      "id": "6fdb7b6f-c518-4093-a3ed-198cf9c20e1a",
+      "slug": "rambler-mine",
+      "name": "Rambler Mine",
+      "lat": 41.220267,
+      "lng": -106.282029,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Barite",
+        "Loranite",
+        "Orpiment",
+        "Realgar"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/rambler-mine"
+    },
+    {
+      "id": "9555d513-252a-4856-a335-6a78351a0416",
+      "slug": "rattlesnake-mountain-wy",
+      "name": "Rattlesnake Mountain",
+      "lat": 44.527326,
+      "lng": -109.24111,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Anhydrite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/rattlesnake-mountain-wy"
+    },
+    {
+      "id": "1235eacb-1389-4a24-b48b-9604a4b3e8ae",
+      "slug": "rawhide-buttes",
+      "name": "Rawhide Buttes",
+      "lat": 42.593509,
+      "lng": -104.513027,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Azurite",
+        "Bornite",
+        "Chalcocite",
+        "Chrysocolla",
+        "Malachite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/rawhide-buttes"
+    },
+    {
+      "id": "a5aa5545-07d4-43b0-89fe-e5f1dd713739",
+      "slug": "red-buttes",
+      "name": "Red Buttes",
+      "lat": 41.169239,
+      "lng": -105.622073,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/red-buttes"
+    },
+    {
+      "id": "d02eccfb-c8b4-4a1a-9d3e-cce9e9a74032",
+      "slug": "red-desert",
+      "name": "Red Desert",
+      "lat": 41.819392,
+      "lng": -108.279871,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Chert",
+        "Jasper",
+        "Quartz crystals",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/red-desert"
+    },
+    {
+      "id": "dd93001b-3491-4034-b6ea-141dc40dd36f",
+      "slug": "red-gulch",
+      "name": "Red Gulch",
+      "lat": 44.517525,
+      "lng": -107.818876,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/red-gulch"
+    },
+    {
+      "id": "684aa876-65db-4b2a-80d7-4597c08b120c",
+      "slug": "rock-springs",
+      "name": "Rock Springs",
+      "lat": 41.616252,
+      "lng": -109.160524,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Chert",
+        "Jasper",
+        "Quartz crystals",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/rock-springs"
+    },
+    {
+      "id": "e38bffa9-1510-400d-8dfa-3706833ba38c",
+      "slug": "sage-hen-creek",
+      "name": "Sage Hen Creek",
+      "lat": 42.581296,
+      "lng": -107.582615,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sage-hen-creek"
+    },
+    {
+      "id": "dedece0d-1d1d-47bb-b5ab-2b24dc3743d7",
+      "slug": "saratoga",
+      "name": "Saratoga",
+      "lat": 41.501896,
+      "lng": -106.807505,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Opalized wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/saratoga"
+    },
+    {
+      "id": "2173cbd4-4a77-4ba7-9cad-1744255e4c57",
+      "slug": "seminoe-reservoir",
+      "name": "Seminoe Reservoir",
+      "lat": 41.88919,
+      "lng": -106.975222,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Jade"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/seminoe-reservoir"
+    },
+    {
+      "id": "f4569ca7-a920-49bd-8aa6-8237a399901c",
+      "slug": "shirley-basin",
+      "name": "Shirley Basin",
+      "lat": 42.331839,
+      "lng": -106.258527,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Opalized wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/shirley-basin"
+    },
+    {
+      "id": "2408e7ce-7b1f-4e2a-abff-16be35ae815f",
+      "slug": "shoshoni",
+      "name": "Shoshoni",
+      "lat": 43.202309,
+      "lng": -108.064123,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Aquamarine",
+        "Beryl",
+        "Feldspar crystals",
+        "Muscovite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/shoshoni"
+    },
+    {
+      "id": "ea0dad4e-8f7d-41a8-8566-f61a29f8f9a3",
+      "slug": "sierra-madre",
+      "name": "Sierra Madre",
+      "lat": 41.183583,
+      "lng": -107.031803,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Copper minerals",
+        "Cobalt minerals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sierra-madre"
+    },
+    {
+      "id": "77cc8e86-d47a-40ac-86ef-8175a699e55c",
+      "slug": "south-pass-city",
+      "name": "South Pass City",
+      "lat": 42.470488,
+      "lng": -108.769204,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gold"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/south-pass-city"
+    },
+    {
+      "id": "af28ad01-690a-4229-8d54-7eda40049d63",
+      "slug": "split-rock",
+      "name": "Split Rock",
+      "lat": 42.480612,
+      "lng": -107.529306,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Ruby"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/split-rock"
+    },
+    {
+      "id": "b9c00333-3c55-4017-b913-ed816d3bbcd5",
+      "slug": "sportman-lake",
+      "name": "Sportman Lake",
+      "lat": 41.12259,
+      "lng": -105.623239,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sportman-lake"
+    },
+    {
+      "id": "9dc6ec61-aaad-4da4-8ae2-7e9d69bd4f29",
+      "slug": "steamboat-mountain",
+      "name": "Steamboat Mountain",
+      "lat": 41.962413,
+      "lng": -108.965663,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper",
+        "Petrified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/steamboat-mountain"
+    },
+    {
+      "id": "998c9fc3-5609-46aa-a209-4151066974ce",
+      "slug": "sunrise",
+      "name": "Sunrise",
+      "lat": 42.335811,
+      "lng": -104.701574,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Arsenopyrite",
+        "Barite",
+        "Copper minerals"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sunrise"
+    },
+    {
+      "id": "a8002a38-0ad3-4f1b-9da0-23bfe82306d5",
+      "slug": "sweetwater-county",
+      "name": "Sweetwater County",
+      "lat": 41.538763,
+      "lng": -109.484571,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Chert",
+        "Jasper",
+        "Petrified wood",
+        "Silicified wood",
+        "Quartz crystals",
+        "Turritella Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sweetwater-county"
+    },
+    {
+      "id": "0b0a4d43-ede1-4892-aaf6-306c6cf36bf8",
+      "slug": "sweetwater-river-1",
+      "name": "Sweetwater River",
+      "lat": 42.447313,
+      "lng": -108.995841,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sweetwater-river-1"
+    },
+    {
+      "id": "474bf2a3-ef60-4262-b8c0-690a3223eb50",
+      "slug": "sweetwater-river-2",
+      "name": "Sweetwater River",
+      "lat": 42.478824,
+      "lng": -107.368022,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Sweetwater Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sweetwater-river-2"
+    },
+    {
+      "id": "4226c1c8-8c78-42fc-8f67-bbfea505ae23",
+      "slug": "sweetwater-wy",
+      "name": "Sweetwater",
+      "lat": 42.560459,
+      "lng": -108.125428,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Sweetwater Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/sweetwater-wy"
+    },
+    {
+      "id": "ccce80a2-11dd-43a0-a172-d12ab443af7a",
+      "slug": "ten-sleep",
+      "name": "Ten Sleep",
+      "lat": 44.083641,
+      "lng": -107.510926,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Gypsum"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/ten-sleep"
+    },
+    {
+      "id": "2fc72408-4b13-413d-bf16-bd6090a5dff1",
+      "slug": "thermopolis-1",
+      "name": "Thermopolis",
+      "lat": 43.511004,
+      "lng": -108.625825,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Copper minerals",
+        "Limonite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/thermopolis-1"
+    },
+    {
+      "id": "a67adf29-679a-4e81-9e69-8e1fcb744dbc",
+      "slug": "thermopolis-2",
+      "name": "Thermopolis",
+      "lat": 43.688281,
+      "lng": -108.213006,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Selenite crystals",
+        "Travertine"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/thermopolis-2"
+    },
+    {
+      "id": "2eb42ea9-4cca-4d48-9333-2f768632ee42",
+      "slug": "thorofare-wilderness",
+      "name": "Thorofare Wilderness",
+      "lat": 44.123345,
+      "lng": -110.116899,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Jasper",
+        "Opalized wood",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/thorofare-wilderness"
+    },
+    {
+      "id": "754f14b1-a8d8-49c7-9e6a-7982e59a8392",
+      "slug": "wamsutter",
+      "name": "Wamsutter",
+      "lat": 41.569927,
+      "lng": -108.007559,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Turritella Agate"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/wamsutter"
+    },
+    {
+      "id": "df0122d6-aed1-46eb-a7af-259a7964d4c2",
+      "slug": "warm-springs-wy",
+      "name": "Warm Springs",
+      "lat": 42.490826,
+      "lng": -108.172096,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper",
+        "Jade",
+        "Nephrite jade",
+        "Quartz crystals",
+        "Silicified wood"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/warm-springs-wy"
+    },
+    {
+      "id": "3113feff-cf3c-4ae3-b58d-adfa2575fc18",
+      "slug": "warren-peak",
+      "name": "Warren Peak",
+      "lat": 44.473378,
+      "lng": -104.446417,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Azurite",
+        "Malachite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/warren-peak"
+    },
+    {
+      "id": "6f7ce21b-00c8-4d08-8c09-19ef339b569c",
+      "slug": "wheatland",
+      "name": "Wheatland",
+      "lat": 41.939161,
+      "lng": -105.106367,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Moonstone",
+        "Labradorite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/wheatland"
+    },
+    {
+      "id": "b625d915-63b6-485e-ab19-20d824b74859",
+      "slug": "wind-river-streams",
+      "name": "Wind River & Streams",
+      "lat": 43.017999,
+      "lng": -108.452564,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Jasper"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/wind-river-streams"
+    },
+    {
+      "id": "6ab01763-3bfd-41ab-89fb-655312dbf754",
+      "slug": "worland",
+      "name": "Worland",
+      "lat": 43.962376,
+      "lng": -107.892489,
+      "locationType": "Public Access",
+      "foundHere": [
+        "Agate",
+        "Chalcedony",
+        "Red Jasper",
+        "Yellow Jasper",
+        "Quartzite"
+      ],
+      "sourceUrl": "https://rockhounding.org/us/wy/worland"
+    }
+  ]
+}

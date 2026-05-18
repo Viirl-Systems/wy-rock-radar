@@ -32,9 +32,19 @@ import maplibregl, {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { DATA_SOURCES, HOTSPOTS, MATERIALS } from './data';
+import { DATA_SOURCES, HOTSPOTS, MATERIALS, ROCKHOUNDING_ORG_LOCATIONS } from './data';
 import { calculateRockScore, explainScore, getScoreBand, getScoreTone } from './scoring';
-import type { FieldLog, FieldPin, Hotspot, LayerToggleState, MapProviderSettings, Material, TrackPoint, WalkTrack } from './types';
+import type {
+  CommunityReferenceLocation,
+  FieldLog,
+  FieldPin,
+  Hotspot,
+  LayerToggleState,
+  MapProviderSettings,
+  Material,
+  TrackPoint,
+  WalkTrack,
+} from './types';
 
 const STORAGE_KEY = 'wy-rock-radar-field-logs';
 const CUSTOM_DATA_SOURCES_STORAGE_KEY = 'wy-rock-radar-custom-data-sources';
@@ -213,6 +223,7 @@ const initialLayerState: LayerToggleState = {
   publicLand: true,
   claims: true,
   roads: true,
+  communitySites: true,
   notes: true,
 };
 
@@ -362,6 +373,64 @@ function formatAccuracy(value?: number) {
   return `±${(value / 1609.34).toFixed(1)} mi GPS`;
 }
 
+const COMMUNITY_MATERIAL_TERMS: Record<Material, string[]> = {
+  Agate: ['agate', 'dry head agate', 'moss agate', 'turritella agate', 'sweetwater agate', 'goniobasis agate'],
+  Jasper: ['jasper', 'red jasper', 'yellow jasper'],
+  Jade: ['jade', 'nephrite'],
+  'Petrified wood': ['petrified wood', 'agatized wood', 'opalized wood', 'silicified wood'],
+  Quartz: ['quartz', 'quartzite'],
+  'Quartz crystals': ['quartz crystal', 'quartz crystals'],
+  Chalcedony: ['chalcedony', 'silicified algae'],
+  'Common opal': ['opal', 'opalized'],
+  'Chert / flint': ['chert', 'flint'],
+  'Geodes / nodules': ['geode', 'geodes', 'concretion', 'concretions', 'nodule', 'nodules'],
+  'Gold indicators': ['gold'],
+  'Diamond indicators': ['diamond', 'garnet', 'diopside', 'ilmenite', 'chromite'],
+  'Kimberlite / lamproite': ['kimberlite', 'lamproite'],
+  Garnet: ['garnet'],
+  'Chromian diopside': ['diopside', 'chromian diopside', 'chrome diopside'],
+  'Picroilmenite / ilmenite': ['ilmenite', 'picroilmenite'],
+  'Magnetite / hematite': ['magnetite', 'hematite', 'iron'],
+  'Copper minerals': ['copper', 'chrysocolla', 'bornite', 'chalcocite'],
+  'Malachite / azurite': ['malachite', 'azurite'],
+  'Pyrite / chalcopyrite': ['pyrite', 'chalcopyrite'],
+  'Feldspar / pegmatite': ['feldspar', 'pegmatite'],
+  'Beryl / mica': ['beryl', 'mica', 'muscovite'],
+  Amazonite: ['amazonite'],
+  Tourmaline: ['tourmaline'],
+  'Moonstone / labradorite': ['moonstone', 'labradorite'],
+  Calcite: ['calcite'],
+  Aragonite: ['aragonite'],
+  Barite: ['barite'],
+  Fluorite: ['fluorite'],
+  Kyanite: ['kyanite'],
+  'Corundum / sapphire': ['corundum', 'sapphire'],
+  'Gypsum / selenite': ['gypsum', 'selenite'],
+  'Travertine / onyx marble': ['travertine', 'onyx marble'],
+  Alabaster: ['alabaster'],
+  Bloodstone: ['bloodstone'],
+  Obsidian: ['obsidian'],
+  'Fossil caution': ['fossil', 'dinosaur', 'gastrolith', 'turritella', 'silicified algae'],
+  'Uranium caution': ['uranium', 'uraninite', 'uranophane', 'autunite', 'coffinite'],
+  'Unusual minerals': ['mineral', 'crystal', 'stechemigite', 'ilsemannite', 'anhydrite'],
+};
+
+function communityLocationMatchesMaterials(location: CommunityReferenceLocation, selectedMaterials: Material[]) {
+  if (selectedMaterials.length === 0) return true;
+  const foundText = location.foundHere.join(' ').toLowerCase();
+
+  return selectedMaterials.some((material) =>
+    (COMMUNITY_MATERIAL_TERMS[material] ?? [material]).some((term) => foundText.includes(term.toLowerCase())),
+  );
+}
+
+function communityLocationMatchesQuery(location: CommunityReferenceLocation, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  return [location.name, location.locationType, ...location.foundHere].join(' ').toLowerCase().includes(normalizedQuery);
+}
+
 function getTrackDistanceMiles(points: TrackPoint[]) {
   return points.reduce((total, point, index) => {
     if (index === 0) return total;
@@ -471,7 +540,7 @@ function isBasemapConfigured(option: BasemapOption) {
 
 export default function App() {
   const [selectedId, setSelectedId] = useState(HOTSPOTS[0].id);
-  const [selectedMaterials, setSelectedMaterials] = useState<Material[]>(['Agate', 'Jasper', 'Jade', 'Petrified wood']);
+  const [selectedMaterials, setSelectedMaterials] = useState<Material[]>([]);
   const [accessFilter, setAccessFilter] = useState('All');
   const [minimumScore, setMinimumScore] = useState(45);
   const [query, setQuery] = useState('');
@@ -569,6 +638,21 @@ export default function App() {
       return materialMatch && accessMatch && scoreMatch && queryMatch;
     });
   }, [accessFilter, minimumScore, query, scoredHotspots, selectedMaterials]);
+
+  const visibleCommunityLocations = useMemo(
+    () =>
+      ROCKHOUNDING_ORG_LOCATIONS.filter(
+        (location) =>
+          communityLocationMatchesMaterials(location, selectedMaterials) && communityLocationMatchesQuery(location, query),
+      ),
+    [query, selectedMaterials],
+  );
+
+  useEffect(() => {
+    if (!filteredHotspots.length) return;
+    if (filteredHotspots.some(({ hotspot }) => hotspot.id === selectedId)) return;
+    setSelectedId(filteredHotspots[0].hotspot.id);
+  }, [filteredHotspots, selectedId]);
 
   const selected = useMemo(() => {
     return scoredHotspots.find(({ hotspot }) => hotspot.id === selectedId) ?? scoredHotspots[0];
@@ -999,6 +1083,26 @@ export default function App() {
         '',
         hotspot.sourceNotes.join('; '),
       ]),
+      ...ROCKHOUNDING_ORG_LOCATIONS.map((location) => [
+        'community reference',
+        location.name,
+        '',
+        '',
+        '',
+        location.locationType,
+        'Unknown',
+        location.foundHere.join('; '),
+        location.lat,
+        location.lng,
+        '',
+        'Community-submitted rockhounding pin',
+        '',
+        '',
+        '',
+        '',
+        '',
+        location.sourceUrl,
+      ]),
       ...logs.map((log) => {
         const hotspot = HOTSPOTS.find((item) => item.id === log.hotspotId);
         const score = hotspot ? calculateRockScore(hotspot.scoreFactors) : '';
@@ -1120,6 +1224,18 @@ export default function App() {
         properties: {
           ...pin,
           recordType: 'fieldPin',
+        },
+      })),
+      ...ROCKHOUNDING_ORG_LOCATIONS.map((location) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [location.lng, location.lat],
+        },
+        properties: {
+          ...location,
+          recordType: 'communityReference',
+          warning: 'Community-submitted reference. Verify before field use.',
         },
       })),
       ...walkTracks.map((track) => ({
@@ -1390,6 +1506,7 @@ export default function App() {
             <WyomingMap
               activeBasemap={activeBasemap}
               activeTrack={activeTrack}
+              communityLocations={visibleCommunityLocations}
               fieldPins={fieldPins}
               filteredHotspots={filteredHotspots.map((item) => item.hotspot)}
               layers={layers}
@@ -1419,6 +1536,9 @@ export default function App() {
               </span>
               <span>
                 <i className="legend-dot pin" /> Field pin
+              </span>
+              <span>
+                <i className="legend-dot community" /> Community ref
               </span>
               <span>
                 <i className="legend-line walk" /> Walk path
@@ -1808,6 +1928,12 @@ function DataStatusPanel({
       status: 'Local',
       detail: `${fieldPins.length} pins · ${walkTracks.length} saved walks`,
       tone: 'local' as const,
+    },
+    {
+      name: 'Rockhounding.org monitor',
+      status: 'Daily cron',
+      detail: `${ROCKHOUNDING_ORG_LOCATIONS.length} community pins in baseline; Vercel checks for new or changed pins daily.`,
+      tone: 'custom' as const,
     },
     {
       name: 'Optional imagery providers',
@@ -2317,6 +2443,32 @@ function fieldPinsData(pins: FieldPin[]): MapFeatureCollection {
   );
 }
 
+function communityReferenceData(locations: CommunityReferenceLocation[]): MapFeatureCollection {
+  return featureCollection(
+    locations.map((location) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [location.lng, location.lat] },
+      properties: {
+        id: location.id,
+        slug: location.slug,
+        name: location.name,
+        foundHere: location.foundHere.slice(0, 8).join(', '),
+        locationType: location.locationType,
+        sourceUrl: location.sourceUrl,
+      },
+    })),
+  );
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function walkTracksData(walkTracks: WalkTrack[], activeTrack: WalkTrack | null): MapFeatureCollection {
   const savedFeatures = walkTracks
     .filter((track) => track.points.length > 1)
@@ -2405,6 +2557,7 @@ function radiusFitMaxZoom(radiusMiles: number) {
 function WyomingMap({
   activeBasemap,
   activeTrack,
+  communityLocations,
   fieldPins,
   filteredHotspots,
   layers,
@@ -2417,6 +2570,7 @@ function WyomingMap({
 }: {
   activeBasemap: BasemapId;
   activeTrack: WalkTrack | null;
+  communityLocations: CommunityReferenceLocation[];
   fieldPins: FieldPin[];
   filteredHotspots: Hotspot[];
   layers: LayerToggleState;
@@ -2591,6 +2745,44 @@ function WyomingMap({
         },
       });
 
+      map.addSource('community-sites', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'community-sites',
+        type: 'circle',
+        source: 'community-sites',
+        paint: {
+          'circle-color': '#d8c78b',
+          'circle-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.52, 10, 0.86],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.2, 10, 7.5],
+          'circle-stroke-color': '#26332c',
+          'circle-stroke-opacity': 0.62,
+          'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 10, 1.4],
+        },
+      });
+
+      map.on('click', 'community-sites', (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const coordinates = (feature.geometry as { type: 'Point'; coordinates: [number, number] }).coordinates;
+        const properties = feature.properties ?? {};
+
+        new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+          .setLngLat(coordinates)
+          .setHTML(`
+            <strong>${escapeHtml(properties.name)}</strong>
+            <span>${escapeHtml(properties.locationType)}</span>
+            <em>${escapeHtml(properties.foundHere)}</em>
+            <a href="${escapeHtml(properties.sourceUrl)}" target="_blank" rel="noreferrer">Open source pin</a>
+          `)
+          .addTo(map);
+      });
+      map.on('mouseenter', 'community-sites', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'community-sites', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
       mapReadyRef.current = true;
       setMapReady(true);
       map.resize();
@@ -2629,12 +2821,18 @@ function WyomingMap({
       featureCollection(
         filteredHotspots.map((hotspot) =>
           buildHotspotFeature(hotspot, {
-            color: hotspot.targetMaterials.includes('Jade')
-              ? '#5f8165'
-              : hotspot.targetMaterials.includes('Petrified wood')
-                ? '#b45f35'
-                : '#45738f',
-            stroke: hotspot.targetMaterials.includes('Jade') ? '#3c6145' : '#4f6e80',
+            color: hotspot.targetMaterials.includes('Kimberlite / lamproite')
+              ? '#686199'
+              : hotspot.targetMaterials.includes('Jade')
+                ? '#5f8165'
+                : hotspot.targetMaterials.includes('Petrified wood')
+                  ? '#b45f35'
+                  : '#45738f',
+            stroke: hotspot.targetMaterials.includes('Kimberlite / lamproite')
+              ? '#47416f'
+              : hotspot.targetMaterials.includes('Jade')
+                ? '#3c6145'
+                : '#4f6e80',
           }),
         ),
       ),
@@ -2657,12 +2855,14 @@ function WyomingMap({
           .map((hotspot) => buildHotspotFeature(hotspot)),
       ),
     );
+    setSourceData(map, 'community-sites', communityReferenceData(communityLocations));
 
     setLayerVisibility(map, ['geology-signal'], layers.geology);
     setLayerVisibility(map, ['access-signal'], layers.publicLand);
     setLayerVisibility(map, ['claim-signal'], layers.claims);
     setLayerVisibility(map, ['research-routes'], layers.roads);
-  }, [filteredHotspots, layers, mapReady]);
+    setLayerVisibility(map, ['community-sites'], layers.communitySites);
+  }, [communityLocations, filteredHotspots, layers, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2748,7 +2948,9 @@ function WyomingMap({
         <span>
           {activeBasemapOption.label} · native z{activeBasemapOption.nativeZoom}
         </span>
-        <span>{visibleIds.size} filtered targets</span>
+        <span>
+          {visibleIds.size} targets · {communityLocations.length} refs
+        </span>
       </div>
     </div>
   );

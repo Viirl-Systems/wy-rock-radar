@@ -7,10 +7,11 @@ This is intentionally built as a free, handoff-ready MVP:
 - React + Vite frontend
 - MapLibre map canvas with free OpenStreetMap raster tiles
 - No paid map key
-- No backend
+- No app database; field data remains local-first
 - Local browser field logs
 - CSV and GeoJSON export
 - Vercel-ready static deployment
+- Vercel cron endpoint for monitoring Rockhounding.org Wyoming community-pin changes
 
 ## Best Path
 
@@ -41,15 +42,16 @@ Current MVP:
 
 - Wyoming-only rockhounding dashboard
 - Candidate hotspot scoring
-- Material filters
+- Expanded material filters, including kimberlite/diamond indicators, pegmatite minerals, copper indicators, opal/chalcedony, fossils/uranium cautions, and common Wyoming collector targets
 - Access-status filter
-- Layer toggles for geology, public land, claim risk, roads, and notes
+- Layer toggles for geology, public land, claim risk, roads, community reference sites, and notes
 - Selected hotspot inspector
 - Legal/access cautions
 - Local field log
 - CSV export
 - GeoJSON export
 - Free data-source roadmap
+- Daily `/api/rockhounding-sync` source monitor configured in `vercel.json`
 
 Out of scope for v1:
 
@@ -82,10 +84,26 @@ Each input should be treated as a planning signal, not a legal or geological gua
 Primary source roadmap:
 
 - Wyoming State Geological Survey GIS: https://main.wsgs.wyo.gov/gis
+- WSGS Diamonds: https://main.wsgs.wyo.gov/mineral-resources/gemstones/diamonds
+- WSGS Rock Hunting Suggestions for Wyoming: https://www.wsgs.wyo.gov/products/wsgs-1973-mp-121.pdf
 - USGS Mineral Resources Data: https://www.usgs.gov/programs/mineral-resources-program/mineral-resources-data
+- USGS Front Range Kimberlite Studies: https://www.usgs.gov/publications/minor-and-trace-element-contents-kimberlites-front-range-colorado-and-wyoming
 - BLM Wyoming Surface Management Agency: https://gis.blm.gov/wyarcgis/rest/services/Lands/BLM_WY_Surface_Management_Agency/MapServer
 - BLM MLRS Mining Claims: https://gis.blm.gov/nlsdb/rest/services/HUB/BLM_Natl_MLRS_Mining_Claims_Not_Closed/MapServer
 - BLM Wyoming Rockhounding Guide: https://www.blm.gov/documents/wyoming/public-room/brochure/wyoming-rockhounding-guide
+- Rockhounding.org Wyoming Community Map: https://rockhounding.org/maps/us/wyoming
+
+## Scheduled Source Monitor
+
+The production deployment calls `/api/rockhounding-sync` daily at 14:00 UTC. The endpoint fetches the Rockhounding.org Wyoming map, parses the public pin payload, compares it to the committed baseline, and returns new, removed, or changed community locations.
+
+For stricter production auth, set `CRON_SECRET` in Vercel. When present, the endpoint requires:
+
+```text
+Authorization: Bearer $CRON_SECRET
+```
+
+This first pass is a read-only monitor. It does not write to a database yet; the next production step is to store sync snapshots in Postgres or another durable store and surface a "new source locations" review queue in the app.
 
 Recommended GIS workflow:
 
@@ -112,8 +130,11 @@ The app should always preserve these rules:
 Important files:
 
 - `src/data.ts`: candidate zones, material list, official data-source links
+- `src/data/rockhounding-wyoming-baseline.json`: Rockhounding.org Wyoming community-pin baseline for reference pins and change monitoring
 - `src/scoring.ts`: scoring model and score-band logic
 - `src/App.tsx`: dashboard UI, map prototype, filters, field logs, exports
 - `src/styles.css`: full visual system and responsive layout
+- `api/rockhounding-sync.mjs`: Vercel cron-compatible source monitor
+- `vercel.json`: daily Vercel cron schedule
 
 The project is ready to hand to Gwen as a working product prototype plus a clear path to real GIS-grade data.

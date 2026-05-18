@@ -1,0 +1,14 @@
+{
+  "crons": [
+    {
+      "path": "/api/rockhounding-sync",
+      "schedule": "0 14 * * *"
+    }
+  ],
+  "functions": {
+    "api/rockhounding-sync.mjs": {
+      "includeFiles": "src/data/rockhounding-wyoming-baseline.json",
+      "maxDuration": 10
+    }
+  }
+}
