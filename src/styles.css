@@ -328,6 +328,220 @@ button:disabled {
   line-height: 1.25;
 }
 
+.data-status-block,
+.data-settings-block {
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+}
+
+.freshness-card {
+  display: grid;
+  gap: 2px;
+  padding: 9px;
+  color: rgba(248, 243, 232, 0.72);
+  background: rgba(20, 28, 23, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.freshness-card span,
+.status-row span,
+.custom-source-row span {
+  color: rgba(248, 243, 232, 0.62);
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.freshness-card strong {
+  color: #fff8eb;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.freshness-card em {
+  color: rgba(248, 243, 232, 0.68);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.status-list {
+  display: grid;
+  gap: 7px;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.status-row strong,
+.custom-source-row strong {
+  display: block;
+  color: #fff8eb;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(248, 243, 232, 0.4);
+  box-shadow: 0 0 0 3px rgba(248, 243, 232, 0.07);
+}
+
+.status-indicator.connected,
+.status-pill.connected {
+  background: rgba(95, 129, 101, 0.22);
+}
+
+.status-indicator.connected {
+  background: #89b481;
+}
+
+.status-indicator.local {
+  background: #cf7b48;
+}
+
+.status-indicator.manual {
+  background: #d8c78b;
+}
+
+.status-indicator.custom {
+  background: #8db0c5;
+}
+
+.status-pill {
+  padding: 3px 6px;
+  color: #fff8eb;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.status-pill.local {
+  background: rgba(207, 123, 72, 0.2);
+}
+
+.status-pill.manual {
+  background: rgba(216, 199, 139, 0.16);
+}
+
+.status-pill.custom {
+  background: rgba(141, 176, 197, 0.18);
+}
+
+.data-settings-block {
+  display: block;
+}
+
+.data-settings-block summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #fff3df;
+  cursor: pointer;
+  list-style: none;
+}
+
+.data-settings-block summary::-webkit-details-marker {
+  display: none;
+}
+
+.data-settings-block summary > span:last-child {
+  color: rgba(248, 243, 232, 0.58);
+  font-size: 0.7rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.source-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.source-form label {
+  display: grid;
+  gap: 5px;
+  color: rgba(248, 243, 232, 0.7);
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.source-form input,
+.source-form select,
+.source-form textarea {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 9px;
+  color: var(--ink);
+  background: #fffdf7;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+}
+
+.source-form textarea {
+  min-height: 70px;
+  padding: 8px 9px;
+  resize: vertical;
+}
+
+.custom-source-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.custom-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  background: rgba(20, 28, 23, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.custom-source-row a,
+.custom-source-row button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #ffe5c8;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  text-decoration: none;
+}
+
+.custom-source-row button:disabled {
+  color: rgba(255, 229, 200, 0.58);
+  cursor: default;
+  opacity: 0.7;
+}
+
 .spin {
   animation: spin 900ms linear infinite;
 }
@@ -410,6 +624,11 @@ input[type='range'] {
   background: #fffdf7;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.basemap-field {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .toggle-list {

@@ -15,10 +15,12 @@ import {
   Mountain,
   Navigation,
   NotebookPen,
+  Plus,
   Route,
   Search,
   ShieldAlert,
   SlidersHorizontal,
+  Trash2,
   X,
 } from 'lucide-react';
 import maplibregl, {
@@ -34,7 +36,9 @@ import { calculateRockScore, explainScore, getScoreBand, getScoreTone } from './
 import type { FieldLog, Hotspot, LayerToggleState, Material } from './types';
 
 const STORAGE_KEY = 'wy-rock-radar-field-logs';
+const CUSTOM_DATA_SOURCES_STORAGE_KEY = 'wy-rock-radar-custom-data-sources';
 const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
+const MODEL_LAST_UPDATED = 'May 18, 2026';
 
 const WY_BOUNDS = {
   minLat: 40.95,
@@ -50,6 +54,26 @@ const WYOMING_MAX_BOUNDS: [[number, number], [number, number]] = [
 ];
 const WYOMING_VIEWBOX = `${WY_BOUNDS.minLng},${WY_BOUNDS.maxLat},${WY_BOUNDS.maxLng},${WY_BOUNDS.minLat}`;
 
+type BasemapId = 'street' | 'topo' | 'imagery' | 'hybrid';
+
+const DEFAULT_BASEMAP_ID: BasemapId = 'hybrid';
+const BASEMAP_OPTIONS: Array<{
+  id: BasemapId;
+  label: string;
+  layerId: string;
+  nativeZoom: number;
+}> = [
+  { id: 'hybrid', label: 'USGS aerial + topo', layerId: 'basemap-usgs-hybrid', nativeZoom: 16 },
+  { id: 'imagery', label: 'USGS aerial', layerId: 'basemap-usgs-imagery', nativeZoom: 16 },
+  { id: 'topo', label: 'USGS topo', layerId: 'basemap-usgs-topo', nativeZoom: 16 },
+  { id: 'street', label: 'Street', layerId: 'basemap-street', nativeZoom: 19 },
+];
+const BASEMAP_LAYER_IDS = BASEMAP_OPTIONS.map((option) => option.layerId);
+
+function getDefaultBasemapVisibility(id: BasemapId) {
+  return id === DEFAULT_BASEMAP_ID ? 'visible' : 'none';
+}
+
 const MAP_STYLE: StyleSpecification = {
   version: 8,
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -58,19 +82,84 @@ const MAP_STYLE: StyleSpecification = {
       type: 'raster',
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
+      maxzoom: 19,
       attribution: '© OpenStreetMap contributors',
+    },
+    usgsTopo: {
+      type: 'raster',
+      tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 16,
+      attribution: 'USGS The National Map',
+    },
+    usgsImagery: {
+      type: 'raster',
+      tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 16,
+      attribution: 'USDA, USGS The National Map',
+    },
+    usgsHybrid: {
+      type: 'raster',
+      tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 16,
+      attribution: 'USDA, USGS The National Map',
     },
   },
   layers: [
     {
-      id: 'osm',
+      id: 'basemap-street',
       type: 'raster',
       source: 'osm',
+      layout: {
+        visibility: getDefaultBasemapVisibility('street'),
+      },
       paint: {
         'raster-saturation': -0.42,
         'raster-contrast': -0.08,
         'raster-brightness-min': 0.12,
         'raster-brightness-max': 0.93,
+      },
+    },
+    {
+      id: 'basemap-usgs-topo',
+      type: 'raster',
+      source: 'usgsTopo',
+      layout: {
+        visibility: getDefaultBasemapVisibility('topo'),
+      },
+      paint: {
+        'raster-saturation': -0.12,
+        'raster-contrast': -0.04,
+      },
+    },
+    {
+      id: 'basemap-usgs-imagery',
+      type: 'raster',
+      source: 'usgsImagery',
+      layout: {
+        visibility: getDefaultBasemapVisibility('imagery'),
+      },
+      paint: {
+        'raster-saturation': -0.08,
+        'raster-contrast': -0.06,
+        'raster-brightness-min': 0.04,
+        'raster-brightness-max': 0.94,
+      },
+    },
+    {
+      id: 'basemap-usgs-hybrid',
+      type: 'raster',
+      source: 'usgsHybrid',
+      layout: {
+        visibility: getDefaultBasemapVisibility('hybrid'),
+      },
+      paint: {
+        'raster-saturation': -0.06,
+        'raster-contrast': -0.05,
+        'raster-brightness-min': 0.04,
+        'raster-brightness-max': 0.95,
       },
     },
   ],
@@ -117,6 +206,55 @@ type NominatimSearchResult = {
   lat: string;
   lon: string;
 };
+
+type DataSourceStatus = {
+  name: string;
+  status: string;
+  detail: string;
+  tone: 'connected' | 'local' | 'manual' | 'custom';
+};
+
+type CustomDataSource = {
+  id: string;
+  name: string;
+  type: 'Reference' | 'Service/API' | 'Dataset' | 'Claim/access';
+  url: string;
+  notes: string;
+  addedAt: string;
+};
+
+const DATA_SOURCE_STATUS: DataSourceStatus[] = [
+  {
+    name: 'OpenStreetMap tiles',
+    status: 'Connected',
+    detail: 'Street basemap context to zoom 19.',
+    tone: 'connected',
+  },
+  {
+    name: 'USGS National Map',
+    status: 'Connected',
+    detail: 'Topo and aerial basemaps for field-scale review.',
+    tone: 'connected',
+  },
+  {
+    name: 'Address lookup',
+    status: 'Connected',
+    detail: 'Nominatim geocoder, bounded to Wyoming.',
+    tone: 'connected',
+  },
+  {
+    name: 'Field logs',
+    status: 'Local',
+    detail: 'Saved in this browser until exported.',
+    tone: 'local',
+  },
+  {
+    name: 'WSGS / BLM references',
+    status: 'Reference',
+    detail: 'Linked for manual review; no auto-sync yet.',
+    tone: 'manual',
+  },
+];
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
@@ -204,6 +342,15 @@ function readStoredLogs(): FieldLog[] {
   }
 }
 
+function readStoredCustomDataSources(): CustomDataSource[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_DATA_SOURCES_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as CustomDataSource[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
   const [selectedId, setSelectedId] = useState(HOTSPOTS[0].id);
   const [selectedMaterials, setSelectedMaterials] = useState<Material[]>(['Agate', 'Jasper', 'Jade', 'Petrified wood']);
@@ -215,8 +362,10 @@ export default function App() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [activeBasemap, setActiveBasemap] = useState<BasemapId>(DEFAULT_BASEMAP_ID);
   const [layers, setLayers] = useState<LayerToggleState>(initialLayerState);
   const [logs, setLogs] = useState<FieldLog[]>([]);
+  const [customDataSources, setCustomDataSources] = useState<CustomDataSource[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [fieldDraft, setFieldDraft] = useState({
     materialGuess: 'Unknown' as FieldLog['materialGuess'],
@@ -225,14 +374,25 @@ export default function App() {
     returnWorthy: true,
     notes: '',
   });
+  const [dataSourceDraft, setDataSourceDraft] = useState({
+    name: '',
+    type: 'Reference' as CustomDataSource['type'],
+    url: '',
+    notes: '',
+  });
 
   useEffect(() => {
     setLogs(readStoredLogs());
+    setCustomDataSources(readStoredCustomDataSources());
   }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
   }, [logs]);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_DATA_SOURCES_STORAGE_KEY, JSON.stringify(customDataSources));
+  }, [customDataSources]);
 
   const scoredHotspots = useMemo(
     () =>
@@ -390,6 +550,36 @@ export default function App() {
     setAddressQuery('');
     setLocationError('');
     setUserLocation(null);
+  }
+
+  function addCustomDataSource(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = dataSourceDraft.name.trim();
+    const url = dataSourceDraft.url.trim();
+    const notes = dataSourceDraft.notes.trim();
+
+    if (!name || !url) return;
+
+    const newSource: CustomDataSource = {
+      id: crypto.randomUUID(),
+      name,
+      type: dataSourceDraft.type,
+      url,
+      notes,
+      addedAt: new Date().toISOString(),
+    };
+
+    setCustomDataSources((current) => [newSource, ...current]);
+    setDataSourceDraft({
+      name: '',
+      type: 'Reference',
+      url: '',
+      notes: '',
+    });
+  }
+
+  function removeCustomDataSource(id: string) {
+    setCustomDataSources((current) => current.filter((source) => source.id !== id));
   }
 
   function addFieldLog(event: FormEvent<HTMLFormElement>) {
@@ -643,6 +833,16 @@ export default function App() {
             <Layers size={15} />
             <h2 id="layer-controls">Map Layers</h2>
           </div>
+          <label className="select-field basemap-field">
+            <span>Basemap</span>
+            <select value={activeBasemap} onChange={(event) => setActiveBasemap(event.target.value as BasemapId)}>
+              {BASEMAP_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="toggle-list">
             {Object.entries(layers).map(([key, value]) => (
               <label key={key} className="toggle-row">
@@ -656,6 +856,16 @@ export default function App() {
             ))}
           </div>
         </section>
+
+        <DataStatusPanel customSources={customDataSources} logs={logs} />
+
+        <DataSettingsPanel
+          draft={dataSourceDraft}
+          sources={customDataSources}
+          onAdd={addCustomDataSource}
+          onChange={setDataSourceDraft}
+          onRemove={removeCustomDataSource}
+        />
 
         <div className="legal-callout">
           <ShieldAlert size={18} />
@@ -702,6 +912,7 @@ export default function App() {
             </div>
 
             <WyomingMap
+              activeBasemap={activeBasemap}
               filteredHotspots={filteredHotspots.map((item) => item.hotspot)}
               layers={layers}
               selectedId={selected.hotspot.id}
@@ -855,6 +1066,173 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
   );
 }
 
+function DataStatusPanel({
+  customSources,
+  logs,
+}: {
+  customSources: CustomDataSource[];
+  logs: FieldLog[];
+}) {
+  const latestLog = logs
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  const fieldLogDetail = latestLog
+    ? `${logs.length} saved · last log ${formatDate(latestLog.date)}`
+    : 'No browser field logs yet';
+  const sourceRows = [
+    ...DATA_SOURCE_STATUS,
+    ...customSources.slice(0, 3).map<DataSourceStatus>((source) => ({
+      name: source.name,
+      status: source.type,
+      detail: source.notes || 'User-added source for trip research.',
+      tone: 'custom',
+    })),
+  ];
+
+  return (
+    <section className="filter-block data-status-block" aria-labelledby="data-status">
+      <div className="section-title">
+        <Database size={15} />
+        <h2 id="data-status">Data Status</h2>
+      </div>
+
+      <div className="freshness-card">
+        <span>Last model update</span>
+        <strong>{MODEL_LAST_UPDATED}</strong>
+        <em>{HOTSPOTS.length} candidate zones · seed model v0.1</em>
+      </div>
+
+      <div className="status-list">
+        {sourceRows.map((source) => {
+          const detail = source.name === 'Field logs' ? fieldLogDetail : source.detail;
+
+          return (
+            <div key={`${source.name}-${source.status}`} className="status-row">
+              <i className={`status-indicator ${source.tone}`} aria-hidden="true" />
+              <div>
+                <strong>{source.name}</strong>
+                <span>{detail}</span>
+              </div>
+              <em className={`status-pill ${source.tone}`}>{source.status}</em>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function DataSettingsPanel({
+  draft,
+  sources,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  draft: {
+    name: string;
+    type: CustomDataSource['type'];
+    url: string;
+    notes: string;
+  };
+  sources: CustomDataSource[];
+  onAdd: (event: FormEvent<HTMLFormElement>) => void;
+  onChange: React.Dispatch<
+    React.SetStateAction<{
+      name: string;
+      type: CustomDataSource['type'];
+      url: string;
+      notes: string;
+    }>
+  >;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <details className="filter-block data-settings-block">
+      <summary>
+        <span className="section-title">
+          <SlidersHorizontal size={15} />
+          <span>Data Settings</span>
+        </span>
+        <span>{sources.length} saved</span>
+      </summary>
+
+      <form className="source-form" onSubmit={onAdd}>
+        <label>
+          Source name
+          <input
+            value={draft.name}
+            onChange={(event) => onChange((current) => ({ ...current, name: event.target.value }))}
+            placeholder="County GIS, rock guide, claim map"
+          />
+        </label>
+        <label>
+          Source type
+          <select
+            value={draft.type}
+            onChange={(event) => onChange((current) => ({ ...current, type: event.target.value as CustomDataSource['type'] }))}
+          >
+            <option>Reference</option>
+            <option>Service/API</option>
+            <option>Dataset</option>
+            <option>Claim/access</option>
+          </select>
+        </label>
+        <label>
+          URL or path
+          <input
+            value={draft.url}
+            onChange={(event) => onChange((current) => ({ ...current, url: event.target.value }))}
+            placeholder="https://... or internal notes path"
+            type="text"
+          />
+        </label>
+        <label>
+          Notes
+          <textarea
+            value={draft.notes}
+            onChange={(event) => onChange((current) => ({ ...current, notes: event.target.value }))}
+            placeholder="What this source verifies, coverage area, or refresh caveat."
+          />
+        </label>
+        <button className="sidebar-button sidebar-button-primary" type="submit" disabled={!draft.name.trim() || !draft.url.trim()}>
+          <Plus size={15} />
+          Add source
+        </button>
+      </form>
+
+      {sources.length > 0 && (
+        <div className="custom-source-list">
+          {sources.map((source) => {
+            const canOpenSource = /^https?:\/\//i.test(source.url);
+
+            return (
+              <div className="custom-source-row" key={source.id}>
+                <div>
+                  <strong>{source.name}</strong>
+                  <span>{source.type} · added {formatDate(source.addedAt)}</span>
+                </div>
+                {canOpenSource ? (
+                  <a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`}>
+                    <ExternalLink size={14} />
+                  </a>
+                ) : (
+                  <button type="button" disabled title={source.url} aria-label={`${source.name} saved as a path`}>
+                    <BookOpen size={14} />
+                  </button>
+                )}
+                <button type="button" onClick={() => onRemove(source.id)} aria-label={`Remove ${source.name}`}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </details>
+  );
+}
+
 type MapFeatureProperties = Record<string, string | number | boolean | null>;
 type MapFeature =
   | {
@@ -985,7 +1363,16 @@ function radiusBounds(location: UserLocation, radiusMiles: number): [[number, nu
   ];
 }
 
+function radiusFitMaxZoom(radiusMiles: number) {
+  if (radiusMiles <= 10) return 10.8;
+  if (radiusMiles <= 25) return 9.7;
+  if (radiusMiles <= 50) return 8.8;
+  if (radiusMiles <= 75) return 8.3;
+  return 7.9;
+}
+
 function WyomingMap({
+  activeBasemap,
   filteredHotspots,
   layers,
   selectedId,
@@ -993,6 +1380,7 @@ function WyomingMap({
   searchRadiusMiles,
   onSelect,
 }: {
+  activeBasemap: BasemapId;
   filteredHotspots: Hotspot[];
   layers: LayerToggleState;
   selectedId: string;
@@ -1012,6 +1400,8 @@ function WyomingMap({
     () => HOTSPOTS.find((hotspot) => hotspot.id === selectedId) ?? HOTSPOTS[0],
     [selectedId],
   );
+  const activeBasemapOption =
+    BASEMAP_OPTIONS.find((option) => option.id === activeBasemap) ?? BASEMAP_OPTIONS[0];
 
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return;
@@ -1022,7 +1412,7 @@ function WyomingMap({
       container: mapNodeRef.current,
       dragRotate: false,
       maxBounds: WYOMING_MAX_BOUNDS,
-      maxZoom: 11,
+      maxZoom: 18.5,
       minZoom: 5,
       pitchWithRotate: false,
       style: MAP_STYLE,
@@ -1156,6 +1546,16 @@ function WyomingMap({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
+    BASEMAP_LAYER_IDS.forEach((layerId) => {
+      if (!map.getLayer(layerId)) return;
+      map.setLayoutProperty(layerId, 'visibility', layerId === activeBasemapOption.layerId ? 'visible' : 'none');
+    });
+  }, [activeBasemapOption.layerId, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
     setSourceData(
       map,
       'geology-signal',
@@ -1261,7 +1661,7 @@ function WyomingMap({
     map.fitBounds(radiusBounds(userLocation, searchRadiusMiles), {
       duration: 700,
       essential: true,
-      maxZoom: 8.8,
+      maxZoom: radiusFitMaxZoom(searchRadiusMiles),
       padding: { bottom: 86, left: 72, right: 72, top: 72 },
     });
   }, [mapReady, searchRadiusMiles, userLocation]);
@@ -1270,7 +1670,9 @@ function WyomingMap({
     <div className="map-canvas">
       <div ref={mapNodeRef} className="maplibre-host" aria-label="Interactive Wyoming candidate hotspot map" />
       <div className="map-status-strip" aria-hidden="true">
-        <span>Interactive Wyoming basemap</span>
+        <span>
+          {activeBasemapOption.label} · native z{activeBasemapOption.nativeZoom}
+        </span>
         <span>{visibleIds.size} filtered targets</span>
       </div>
     </div>
