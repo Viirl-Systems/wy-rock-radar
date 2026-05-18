@@ -10,6 +10,7 @@ import {
   Filter,
   Flag,
   Layers,
+  LocateFixed,
   LoaderCircle,
   MapPinned,
   Mountain,
@@ -33,10 +34,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { DATA_SOURCES, HOTSPOTS, MATERIALS } from './data';
 import { calculateRockScore, explainScore, getScoreBand, getScoreTone } from './scoring';
-import type { FieldLog, Hotspot, LayerToggleState, Material } from './types';
+import type { FieldLog, FieldPin, Hotspot, LayerToggleState, MapProviderSettings, Material, TrackPoint, WalkTrack } from './types';
 
 const STORAGE_KEY = 'wy-rock-radar-field-logs';
 const CUSTOM_DATA_SOURCES_STORAGE_KEY = 'wy-rock-radar-custom-data-sources';
+const FIELD_PINS_STORAGE_KEY = 'wy-rock-radar-field-pins';
+const WALK_TRACKS_STORAGE_KEY = 'wy-rock-radar-walk-tracks';
+const MAP_PROVIDER_SETTINGS_STORAGE_KEY = 'wy-rock-radar-map-provider-settings';
 const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const MODEL_LAST_UPDATED = 'May 18, 2026';
 
@@ -54,21 +58,39 @@ const WYOMING_MAX_BOUNDS: [[number, number], [number, number]] = [
 ];
 const WYOMING_VIEWBOX = `${WY_BOUNDS.minLng},${WY_BOUNDS.maxLat},${WY_BOUNDS.maxLng},${WY_BOUNDS.minLat}`;
 
-type BasemapId = 'street' | 'topo' | 'imagery' | 'hybrid';
+type BasemapId = 'street' | 'topo' | 'imagery' | 'hybrid' | 'arcgis' | 'mapbox' | 'maptiler' | 'custom';
 
 const DEFAULT_BASEMAP_ID: BasemapId = 'hybrid';
-const BASEMAP_OPTIONS: Array<{
+type BasemapOption = {
   id: BasemapId;
   label: string;
   layerId: string;
   nativeZoom: number;
-}> = [
+  configured?: boolean;
+};
+
+const BUILT_IN_BASEMAP_OPTIONS: BasemapOption[] = [
   { id: 'hybrid', label: 'USGS aerial + topo', layerId: 'basemap-usgs-hybrid', nativeZoom: 16 },
   { id: 'imagery', label: 'USGS aerial', layerId: 'basemap-usgs-imagery', nativeZoom: 16 },
   { id: 'topo', label: 'USGS topo', layerId: 'basemap-usgs-topo', nativeZoom: 16 },
   { id: 'street', label: 'Street', layerId: 'basemap-street', nativeZoom: 19 },
 ];
+const OPTIONAL_BASEMAP_OPTIONS: BasemapOption[] = [
+  { id: 'arcgis', label: 'ArcGIS World Imagery', layerId: 'basemap-arcgis', nativeZoom: 19 },
+  { id: 'mapbox', label: 'Mapbox satellite', layerId: 'basemap-mapbox', nativeZoom: 18 },
+  { id: 'maptiler', label: 'MapTiler satellite', layerId: 'basemap-maptiler', nativeZoom: 18 },
+  { id: 'custom', label: 'Custom imagery URL', layerId: 'basemap-custom', nativeZoom: 19 },
+];
+const BASEMAP_OPTIONS = [...BUILT_IN_BASEMAP_OPTIONS, ...OPTIONAL_BASEMAP_OPTIONS];
 const BASEMAP_LAYER_IDS = BASEMAP_OPTIONS.map((option) => option.layerId);
+
+const DEFAULT_MAP_PROVIDER_SETTINGS: MapProviderSettings = {
+  arcgisKey: '',
+  mapboxToken: '',
+  maptilerKey: '',
+  customTileUrl: '',
+  customAttribution: '',
+};
 
 function getDefaultBasemapVisibility(id: BasemapId) {
   return id === DEFAULT_BASEMAP_ID ? 'visible' : 'none';
@@ -198,7 +220,8 @@ type UserLocation = {
   label: string;
   lat: number;
   lng: number;
-  source: 'address' | 'coordinates';
+  source: 'address' | 'coordinates' | 'gps' | 'pin';
+  accuracyMeters?: number;
 };
 
 type NominatimSearchResult = {
@@ -333,6 +356,19 @@ function formatMiles(value: number) {
   return `${Math.round(value)} mi`;
 }
 
+function formatAccuracy(value?: number) {
+  if (!value || !Number.isFinite(value)) return 'accuracy unknown';
+  if (value < 100) return `±${Math.round(value)} m GPS`;
+  return `±${(value / 1609.34).toFixed(1)} mi GPS`;
+}
+
+function getTrackDistanceMiles(points: TrackPoint[]) {
+  return points.reduce((total, point, index) => {
+    if (index === 0) return total;
+    return total + getDistanceMiles(points[index - 1], point);
+  }, 0);
+}
+
 function readStoredLogs(): FieldLog[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -351,6 +387,88 @@ function readStoredCustomDataSources(): CustomDataSource[] {
   }
 }
 
+function readStoredFieldPins(): FieldPin[] {
+  try {
+    const raw = localStorage.getItem(FIELD_PINS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as FieldPin[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredWalkTracks(): WalkTrack[] {
+  try {
+    const raw = localStorage.getItem(WALK_TRACKS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as WalkTrack[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredMapProviderSettings(): MapProviderSettings {
+  try {
+    const raw = localStorage.getItem(MAP_PROVIDER_SETTINGS_STORAGE_KEY);
+    return raw ? { ...DEFAULT_MAP_PROVIDER_SETTINGS, ...(JSON.parse(raw) as Partial<MapProviderSettings>) } : DEFAULT_MAP_PROVIDER_SETTINGS;
+  } catch {
+    return DEFAULT_MAP_PROVIDER_SETTINGS;
+  }
+}
+
+function geolocationErrorMessage(error: GeolocationPositionError) {
+  if (error.code === error.PERMISSION_DENIED) return 'Location permission was blocked. Enable location access for this site.';
+  if (error.code === error.POSITION_UNAVAILABLE) return 'GPS position is unavailable right now. Try again outside or with better signal.';
+  if (error.code === error.TIMEOUT) return 'GPS lookup timed out. Try again with a clearer sky view.';
+  return error.message || 'GPS lookup failed.';
+}
+
+function positionToUserLocation(position: GeolocationPosition, label = 'Current GPS location'): UserLocation {
+  return {
+    label,
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    source: 'gps',
+    accuracyMeters: position.coords.accuracy,
+  };
+}
+
+function positionToTrackPoint(position: GeolocationPosition): TrackPoint {
+  return {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    accuracyMeters: position.coords.accuracy,
+    timestamp: new Date(position.timestamp || Date.now()).toISOString(),
+  };
+}
+
+function requestCurrentPosition() {
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('This browser does not support GPS location.'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 14000,
+    });
+  });
+}
+
+function getAvailableBasemaps(settings: MapProviderSettings): BasemapOption[] {
+  return [
+    ...BUILT_IN_BASEMAP_OPTIONS,
+    { ...OPTIONAL_BASEMAP_OPTIONS[0], configured: true },
+    { ...OPTIONAL_BASEMAP_OPTIONS[1], configured: Boolean(settings.mapboxToken.trim()) },
+    { ...OPTIONAL_BASEMAP_OPTIONS[2], configured: Boolean(settings.maptilerKey.trim()) },
+    { ...OPTIONAL_BASEMAP_OPTIONS[3], configured: Boolean(settings.customTileUrl.trim()) },
+  ];
+}
+
+function isBasemapConfigured(option: BasemapOption) {
+  return option.configured ?? true;
+}
+
 export default function App() {
   const [selectedId, setSelectedId] = useState(HOTSPOTS[0].id);
   const [selectedMaterials, setSelectedMaterials] = useState<Material[]>(['Agate', 'Jasper', 'Jade', 'Petrified wood']);
@@ -362,12 +480,26 @@ export default function App() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [activeBasemap, setActiveBasemap] = useState<BasemapId>(DEFAULT_BASEMAP_ID);
   const [layers, setLayers] = useState<LayerToggleState>(initialLayerState);
-  const [logs, setLogs] = useState<FieldLog[]>([]);
-  const [customDataSources, setCustomDataSources] = useState<CustomDataSource[]>([]);
+  const [logs, setLogs] = useState<FieldLog[]>(() => readStoredLogs());
+  const [fieldPins, setFieldPins] = useState<FieldPin[]>(() => readStoredFieldPins());
+  const [walkTracks, setWalkTracks] = useState<WalkTrack[]>(() => readStoredWalkTracks());
+  const [activeTrack, setActiveTrack] = useState<WalkTrack | null>(null);
+  const [customDataSources, setCustomDataSources] = useState<CustomDataSource[]>(() => readStoredCustomDataSources());
+  const [mapProviderSettings, setMapProviderSettings] = useState<MapProviderSettings>(() => readStoredMapProviderSettings());
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isQuickLogOpen, setIsQuickLogOpen] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
   const [fieldDraft, setFieldDraft] = useState({
+    materialGuess: 'Unknown' as FieldLog['materialGuess'],
+    quality: 3,
+    quantity: 'Unknown' as FieldLog['quantity'],
+    returnWorthy: true,
+    notes: '',
+  });
+  const [quickLogDraft, setQuickLogDraft] = useState({
     materialGuess: 'Unknown' as FieldLog['materialGuess'],
     quality: 3,
     quantity: 'Unknown' as FieldLog['quantity'],
@@ -382,17 +514,32 @@ export default function App() {
   });
 
   useEffect(() => {
-    setLogs(readStoredLogs());
-    setCustomDataSources(readStoredCustomDataSources());
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
   }, [logs]);
 
   useEffect(() => {
+    localStorage.setItem(FIELD_PINS_STORAGE_KEY, JSON.stringify(fieldPins));
+  }, [fieldPins]);
+
+  useEffect(() => {
+    localStorage.setItem(WALK_TRACKS_STORAGE_KEY, JSON.stringify(walkTracks));
+  }, [walkTracks]);
+
+  useEffect(() => {
     localStorage.setItem(CUSTOM_DATA_SOURCES_STORAGE_KEY, JSON.stringify(customDataSources));
   }, [customDataSources]);
+
+  useEffect(() => {
+    localStorage.setItem(MAP_PROVIDER_SETTINGS_STORAGE_KEY, JSON.stringify(mapProviderSettings));
+  }, [mapProviderSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation?.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
 
   const scoredHotspots = useMemo(
     () =>
@@ -428,6 +575,8 @@ export default function App() {
   }, [scoredHotspots, selectedId]);
 
   const selectedLogs = logs.filter((log) => log.hotspotId === selected.hotspot.id);
+  const availableBasemaps = useMemo(() => getAvailableBasemaps(mapProviderSettings), [mapProviderSettings]);
+  const selectedDistanceMiles = userLocation ? getDistanceMiles(userLocation, selected.hotspot) : null;
 
   const nearestHotspot = useMemo(() => {
     if (!userLocation) return null;
@@ -451,6 +600,19 @@ export default function App() {
       .filter((item) => item.distanceMiles <= searchRadiusMiles)
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
   }, [scoredHotspots, searchRadiusMiles, userLocation]);
+
+  const nearestPin = useMemo(() => {
+    if (!userLocation || !fieldPins.length) return null;
+
+    return fieldPins
+      .map((pin) => ({
+        pin,
+        distanceMiles: getDistanceMiles(userLocation, pin),
+      }))
+      .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
+  }, [fieldPins, userLocation]);
+
+  const activeTrackDistance = activeTrack ? getTrackDistanceMiles(activeTrack.points) : 0;
 
   const metrics = useMemo(() => {
     const priority = scoredHotspots.filter(({ score, hotspot }) => score >= 80 && hotspot.accessStatus !== 'Restricted / no-go').length;
@@ -480,9 +642,155 @@ export default function App() {
       .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
 
     setUserLocation(location);
+    setAddressQuery(location.source === 'gps' ? '' : addressQuery);
     if (nearest) {
       setSelectedId(nearest.hotspot.id);
     }
+  }
+
+  async function useCurrentLocation() {
+    setIsLocating(true);
+    setLocationError('');
+
+    try {
+      const position = await requestCurrentPosition();
+      const location = positionToUserLocation(position);
+      if (!isInsideWyoming(location.lat, location.lng)) {
+        throw new Error('GPS location is outside the Wyoming field map.');
+      }
+      applyUserLocation(location);
+    } catch (error) {
+      setLocationError(error instanceof Error ? error.message : geolocationErrorMessage(error as GeolocationPositionError));
+    } finally {
+      setIsLocating(false);
+    }
+  }
+
+  async function getFieldLocationForAction() {
+    if (userLocation) return userLocation;
+
+    const position = await requestCurrentPosition();
+    const location = positionToUserLocation(position);
+    if (!isInsideWyoming(location.lat, location.lng)) {
+      throw new Error('GPS location is outside the Wyoming field map.');
+    }
+    applyUserLocation(location);
+    return location;
+  }
+
+  async function dropFieldPin() {
+    setIsLocating(true);
+    setLocationError('');
+
+    try {
+      const location = await getFieldLocationForAction();
+      const pin: FieldPin = {
+        id: crypto.randomUUID(),
+        label: `Field pin ${fieldPins.length + 1}`,
+        lat: location.lat,
+        lng: location.lng,
+        accuracyMeters: location.accuracyMeters,
+        type: 'Current dig',
+        materialGuess: 'Unknown',
+        quality: 3,
+        returnWorthy: true,
+        notes: '',
+        createdAt: new Date().toISOString(),
+        source: location.source === 'gps' ? 'gps' : 'manual',
+      };
+
+      setFieldPins((current) => [pin, ...current]);
+    } catch (error) {
+      setLocationError(error instanceof Error ? error.message : geolocationErrorMessage(error as GeolocationPositionError));
+    } finally {
+      setIsLocating(false);
+    }
+  }
+
+  function startWalkTrack() {
+    if (!navigator.geolocation) {
+      setLocationError('This browser does not support GPS walk tracking.');
+      return;
+    }
+
+    setLocationError('');
+    const startedAt = new Date().toISOString();
+    const newTrack: WalkTrack = {
+      id: crypto.randomUUID(),
+      label: `Walk ${formatDate(startedAt)}`,
+      startedAt,
+      points: [],
+      distanceMiles: 0,
+    };
+
+    setActiveTrack(newTrack);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const location = positionToUserLocation(position);
+        const point = positionToTrackPoint(position);
+        if (isInsideWyoming(location.lat, location.lng)) {
+          setUserLocation(location);
+        }
+        setActiveTrack((current) => {
+          if (!current) return current;
+          const points = [...current.points, point];
+          return { ...current, points, distanceMiles: getTrackDistanceMiles(points) };
+        });
+      },
+      (error) => setLocationError(geolocationErrorMessage(error)),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 16000,
+      },
+    );
+  }
+
+  function stopWalkTrack() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation?.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    if (activeTrack && activeTrack.points.length > 0) {
+      const completedTrack: WalkTrack = {
+        ...activeTrack,
+        endedAt: new Date().toISOString(),
+        distanceMiles: getTrackDistanceMiles(activeTrack.points),
+      };
+      setWalkTracks((current) => [completedTrack, ...current]);
+    } else if (activeTrack) {
+      setLocationError('Walk tracking stopped before a GPS point was captured.');
+    }
+
+    setActiveTrack(null);
+  }
+
+  function toggleWalkTrack() {
+    if (activeTrack) {
+      stopWalkTrack();
+      return;
+    }
+
+    startWalkTrack();
+  }
+
+  function selectFieldPin(pin: FieldPin) {
+    applyUserLocation({
+      label: pin.label,
+      lat: pin.lat,
+      lng: pin.lng,
+      source: 'pin',
+      accuracyMeters: pin.accuracyMeters,
+    });
+  }
+
+  function removeFieldPin(id: string) {
+    setFieldPins((current) => current.filter((pin) => pin.id !== id));
+  }
+
+  function removeWalkTrack(id: string) {
+    setWalkTracks((current) => current.filter((track) => track.id !== id));
   }
 
   async function locateAddress(event: FormEvent<HTMLFormElement>) {
@@ -587,6 +895,10 @@ export default function App() {
     const newLog: FieldLog = {
       id: crypto.randomUUID(),
       hotspotId: selected.hotspot.id,
+      targetType: 'hotspot',
+      targetLabel: selected.hotspot.name,
+      lat: selected.hotspot.lat,
+      lng: selected.hotspot.lng,
       date: new Date().toISOString(),
       materialGuess: fieldDraft.materialGuess,
       quality: fieldDraft.quality,
@@ -606,90 +918,231 @@ export default function App() {
     setIsLogOpen(false);
   }
 
+  function addQuickFieldLog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const targetLocation = userLocation ?? {
+      label: selected.hotspot.name,
+      lat: selected.hotspot.lat,
+      lng: selected.hotspot.lng,
+      source: 'coordinates' as const,
+    };
+    const nearestDroppedPin = fieldPins.find(
+      (pin) => userLocation && getDistanceMiles(userLocation, pin) < 0.03,
+    );
+    const newLog: FieldLog = {
+      id: crypto.randomUUID(),
+      hotspotId: selected.hotspot.id,
+      targetType: nearestDroppedPin ? 'pin' : userLocation ? 'gps' : 'hotspot',
+      targetLabel: nearestDroppedPin?.label ?? targetLocation.label,
+      pinId: nearestDroppedPin?.id,
+      lat: targetLocation.lat,
+      lng: targetLocation.lng,
+      accuracyMeters: targetLocation.accuracyMeters,
+      date: new Date().toISOString(),
+      materialGuess: quickLogDraft.materialGuess,
+      quality: quickLogDraft.quality,
+      quantity: quickLogDraft.quantity,
+      returnWorthy: quickLogDraft.returnWorthy,
+      notes: quickLogDraft.notes.trim(),
+    };
+
+    setLogs((current) => [newLog, ...current]);
+    setQuickLogDraft({
+      materialGuess: 'Unknown',
+      quality: 3,
+      quantity: 'Unknown',
+      returnWorthy: true,
+      notes: '',
+    });
+    setIsQuickLogOpen(false);
+  }
+
   function exportCsv() {
     const rows = [
       [
-        'Hotspot',
+        'Record type',
+        'Name',
         'County',
         'Score',
         'Band',
         'Access',
         'Claim risk',
         'Materials',
+        'Latitude',
+        'Longitude',
+        'Distance miles',
         'Geology',
         'Log date',
         'Material guess',
         'Quality',
+        'Quantity',
         'Return worthy',
         'Notes',
       ],
-      ...scoredHotspots.flatMap(({ hotspot, score, band }) => {
-        const hotspotLogs = logs.filter((log) => log.hotspotId === hotspot.id);
+      ...scoredHotspots.map(({ hotspot, score, band }) => [
+        'candidate',
+        hotspot.name,
+        hotspot.county,
+        score,
+        band,
+        hotspot.accessStatus,
+        hotspot.claimRisk,
+        hotspot.targetMaterials.join('; '),
+        hotspot.lat,
+        hotspot.lng,
+        '',
+        hotspot.geologyUnit,
+        '',
+        '',
+        '',
+        '',
+        '',
+        hotspot.sourceNotes.join('; '),
+      ]),
+      ...logs.map((log) => {
+        const hotspot = HOTSPOTS.find((item) => item.id === log.hotspotId);
+        const score = hotspot ? calculateRockScore(hotspot.scoreFactors) : '';
+        const band = hotspot ? getScoreBand(hotspot) : '';
 
-        if (!hotspotLogs.length) {
-          return [
-            [
-              hotspot.name,
-              hotspot.county,
-              score,
-              band,
-              hotspot.accessStatus,
-              hotspot.claimRisk,
-              hotspot.targetMaterials.join('; '),
-              hotspot.geologyUnit,
-              '',
-              '',
-              '',
-              '',
-              '',
-            ],
-          ];
-        }
-
-        return hotspotLogs.map((log) => [
-          hotspot.name,
-          hotspot.county,
+        return [
+          log.targetType ?? 'field log',
+          log.targetLabel ?? hotspot?.name ?? 'Field log',
+          hotspot?.county ?? '',
           score,
           band,
-          hotspot.accessStatus,
-          hotspot.claimRisk,
-          hotspot.targetMaterials.join('; '),
-          hotspot.geologyUnit,
+          hotspot?.accessStatus ?? '',
+          hotspot?.claimRisk ?? '',
+          hotspot?.targetMaterials.join('; ') ?? '',
+          log.lat ?? hotspot?.lat ?? '',
+          log.lng ?? hotspot?.lng ?? '',
+          '',
+          hotspot?.geologyUnit ?? '',
           formatDate(log.date),
           log.materialGuess,
           log.quality,
+          log.quantity,
           log.returnWorthy ? 'yes' : 'no',
           log.notes,
-        ]);
+        ];
       }),
+      ...fieldPins.map((pin) => [
+        'field pin',
+        pin.label,
+        '',
+        '',
+        '',
+        '',
+        '',
+        pin.materialGuess,
+        pin.lat,
+        pin.lng,
+        '',
+        '',
+        formatDate(pin.createdAt),
+        pin.materialGuess,
+        pin.quality,
+        '',
+        pin.returnWorthy ? 'yes' : 'no',
+        pin.notes,
+      ]),
+      ...walkTracks.map((track) => [
+        'walk track',
+        track.label,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        track.points[0]?.lat ?? '',
+        track.points[0]?.lng ?? '',
+        track.distanceMiles.toFixed(2),
+        '',
+        formatDate(track.startedAt),
+        '',
+        '',
+        '',
+        '',
+        `${track.points.length} GPS points${track.endedAt ? ` · ended ${formatDate(track.endedAt)}` : ''}`,
+      ]),
     ];
 
     downloadFile('wy-rock-radar-field-log.csv', rows.map((row) => row.map(csvEscape).join(',')).join('\n'), 'text/csv');
   }
 
   function exportGeoJson() {
-    const features = scoredHotspots.map(({ hotspot, score, band }) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [hotspot.lng, hotspot.lat],
-      },
-      properties: {
-        id: hotspot.id,
-        name: hotspot.name,
-        county: hotspot.county,
-        score,
-        band,
-        accessStatus: hotspot.accessStatus,
-        claimRisk: hotspot.claimRisk,
-        targetMaterials: hotspot.targetMaterials,
-        geologyUnit: hotspot.geologyUnit,
-        fieldLogs: logs.filter((log) => log.hotspotId === hotspot.id),
-      },
-    }));
+    const activeTrackFeature = activeTrack?.points.length
+      ? [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: activeTrack.points.map((point) => [point.lng, point.lat]),
+            },
+            properties: {
+              id: activeTrack.id,
+              recordType: 'activeWalkTrack',
+              label: activeTrack.label,
+              startedAt: activeTrack.startedAt,
+              distanceMiles: getTrackDistanceMiles(activeTrack.points),
+              pointCount: activeTrack.points.length,
+            },
+          },
+        ]
+      : [];
+    const features = [
+      ...scoredHotspots.map(({ hotspot, score, band }) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [hotspot.lng, hotspot.lat],
+        },
+        properties: {
+          id: hotspot.id,
+          recordType: 'candidate',
+          name: hotspot.name,
+          county: hotspot.county,
+          score,
+          band,
+          accessStatus: hotspot.accessStatus,
+          claimRisk: hotspot.claimRisk,
+          targetMaterials: hotspot.targetMaterials,
+          geologyUnit: hotspot.geologyUnit,
+          fieldLogs: logs.filter((log) => log.hotspotId === hotspot.id),
+        },
+      })),
+      ...fieldPins.map((pin) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [pin.lng, pin.lat],
+        },
+        properties: {
+          ...pin,
+          recordType: 'fieldPin',
+        },
+      })),
+      ...walkTracks.map((track) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: track.points.map((point) => [point.lng, point.lat]),
+        },
+        properties: {
+          id: track.id,
+          recordType: 'walkTrack',
+          label: track.label,
+          startedAt: track.startedAt,
+          endedAt: track.endedAt,
+          distanceMiles: track.distanceMiles,
+          pointCount: track.points.length,
+        },
+      })),
+      ...activeTrackFeature,
+    ];
 
     downloadFile(
-      'wy-rock-radar-hotspots.geojson',
+      'wy-rock-radar-field-data.geojson',
       JSON.stringify({ type: 'FeatureCollection', features }, null, 2),
       'application/geo+json',
     );
@@ -780,6 +1233,21 @@ export default function App() {
           )}
         </section>
 
+        <FieldModePanel
+          activeTrack={activeTrack}
+          activeTrackDistance={activeTrackDistance}
+          fieldPins={fieldPins}
+          isLocating={isLocating}
+          nearestHotspot={nearestHotspot}
+          nearestPin={nearestPin}
+          onDropPin={dropFieldPin}
+          onQuickLog={() => setIsQuickLogOpen(true)}
+          onToggleTrack={toggleWalkTrack}
+          onUseLocation={useCurrentLocation}
+          selectedDistanceMiles={selectedDistanceMiles}
+          walkTracks={walkTracks}
+        />
+
         <section className="filter-block" aria-labelledby="target-materials">
           <div className="section-title">
             <Filter size={15} />
@@ -836,9 +1304,9 @@ export default function App() {
           <label className="select-field basemap-field">
             <span>Basemap</span>
             <select value={activeBasemap} onChange={(event) => setActiveBasemap(event.target.value as BasemapId)}>
-              {BASEMAP_OPTIONS.map((option) => (
+              {availableBasemaps.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.label}
+                  {option.label}{isBasemapConfigured(option) ? '' : ' · setup needed'}
                 </option>
               ))}
             </select>
@@ -857,13 +1325,21 @@ export default function App() {
           </div>
         </section>
 
-        <DataStatusPanel customSources={customDataSources} logs={logs} />
+        <DataStatusPanel
+          customSources={customDataSources}
+          fieldPins={fieldPins}
+          logs={logs}
+          providerSettings={mapProviderSettings}
+          walkTracks={walkTracks}
+        />
 
         <DataSettingsPanel
           draft={dataSourceDraft}
+          providerSettings={mapProviderSettings}
           sources={customDataSources}
           onAdd={addCustomDataSource}
           onChange={setDataSourceDraft}
+          onProviderChange={setMapProviderSettings}
           onRemove={removeCustomDataSource}
         />
 
@@ -913,11 +1389,15 @@ export default function App() {
 
             <WyomingMap
               activeBasemap={activeBasemap}
+              activeTrack={activeTrack}
+              fieldPins={fieldPins}
               filteredHotspots={filteredHotspots.map((item) => item.hotspot)}
               layers={layers}
+              providerSettings={mapProviderSettings}
               selectedId={selected.hotspot.id}
               userLocation={userLocation}
               searchRadiusMiles={searchRadiusMiles}
+              walkTracks={walkTracks}
               onSelect={setSelectedId}
             />
 
@@ -937,6 +1417,12 @@ export default function App() {
               <span>
                 <i className="legend-ring claim" /> Claim risk
               </span>
+              <span>
+                <i className="legend-dot pin" /> Field pin
+              </span>
+              <span>
+                <i className="legend-line walk" /> Walk path
+              </span>
             </div>
           </section>
 
@@ -944,6 +1430,7 @@ export default function App() {
             <Inspector
               hotspot={selected.hotspot}
               score={selected.score}
+              selectedDistanceMiles={selectedDistanceMiles}
               logs={selectedLogs}
               onOpenLog={() => setIsLogOpen(true)}
             />
@@ -956,9 +1443,26 @@ export default function App() {
             selectedId={selected.hotspot.id}
             onSelect={setSelectedId}
           />
+          <FieldNotebookPanel
+            activeTrack={activeTrack}
+            fieldPins={fieldPins}
+            walkTracks={walkTracks}
+            onRemovePin={removeFieldPin}
+            onRemoveTrack={removeWalkTrack}
+            onSelectPin={selectFieldPin}
+          />
           <SourcePanel />
         </section>
       </section>
+
+      <MobileFieldBar
+        activeTrack={activeTrack}
+        isLocating={isLocating}
+        onDropPin={dropFieldPin}
+        onQuickLog={() => setIsQuickLogOpen(true)}
+        onToggleTrack={toggleWalkTrack}
+        onUseLocation={useCurrentLocation}
+      />
 
       {isLogOpen && (
         <div className="modal-backdrop" role="presentation">
@@ -1050,6 +1554,106 @@ export default function App() {
           </form>
         </div>
       )}
+
+      {isQuickLogOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <form className="log-modal quick-log-modal" onSubmit={addQuickFieldLog}>
+            <div className="modal-heading">
+              <div>
+                <p className="eyeline">Quick field log</p>
+                <h2>{userLocation?.label ?? selected.hotspot.name}</h2>
+              </div>
+              <button aria-label="Close quick log" className="icon-button" type="button" onClick={() => setIsQuickLogOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="field-log-context">
+              <MapPinned size={16} />
+              <span>
+                {userLocation
+                  ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)} · ${formatAccuracy(userLocation.accuracyMeters)}`
+                  : 'No GPS yet. Log will attach to the selected candidate.'}
+              </span>
+            </div>
+
+            <div className="form-grid">
+              <label>
+                Material guess
+                <select
+                  value={quickLogDraft.materialGuess}
+                  onChange={(event) =>
+                    setQuickLogDraft((current) => ({
+                      ...current,
+                      materialGuess: event.target.value as FieldLog['materialGuess'],
+                    }))
+                  }
+                >
+                  <option>Unknown</option>
+                  {MATERIALS.map((material) => (
+                    <option key={material}>{material}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quality
+                <input
+                  min="1"
+                  max="5"
+                  type="number"
+                  value={quickLogDraft.quality}
+                  onChange={(event) =>
+                    setQuickLogDraft((current) => ({ ...current, quality: Number(event.target.value) }))
+                  }
+                />
+              </label>
+              <label>
+                Quantity
+                <select
+                  value={quickLogDraft.quantity}
+                  onChange={(event) =>
+                    setQuickLogDraft((current) => ({ ...current, quantity: event.target.value as FieldLog['quantity'] }))
+                  }
+                >
+                  <option>Unknown</option>
+                  <option>Trace</option>
+                  <option>Small pocket</option>
+                  <option>Productive</option>
+                </select>
+              </label>
+              <label className="checkbox-field">
+                <input
+                  checked={quickLogDraft.returnWorthy}
+                  type="checkbox"
+                  onChange={(event) =>
+                    setQuickLogDraft((current) => ({ ...current, returnWorthy: event.target.checked }))
+                  }
+                />
+                Worth returning
+              </label>
+            </div>
+
+            <label className="notes-field">
+              Notes
+              <textarea
+                value={quickLogDraft.notes}
+                onChange={(event) => setQuickLogDraft((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="What did you find, where was it sitting, and should you come back?"
+              />
+            </label>
+
+            <div className="modal-actions">
+              <button className="ghost-button" type="button" onClick={() => setIsQuickLogOpen(false)}>
+                Cancel
+              </button>
+              <button className="primary-button" type="submit">
+                <NotebookPen size={16} />
+                Save quick log
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }
@@ -1066,12 +1670,130 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
   );
 }
 
+function FieldModePanel({
+  activeTrack,
+  activeTrackDistance,
+  fieldPins,
+  isLocating,
+  nearestHotspot,
+  nearestPin,
+  selectedDistanceMiles,
+  walkTracks,
+  onDropPin,
+  onQuickLog,
+  onToggleTrack,
+  onUseLocation,
+}: {
+  activeTrack: WalkTrack | null;
+  activeTrackDistance: number;
+  fieldPins: FieldPin[];
+  isLocating: boolean;
+  nearestHotspot: ({ hotspot: Hotspot; distanceMiles: number } & { score: number; band: string }) | null;
+  nearestPin: { pin: FieldPin; distanceMiles: number } | null;
+  selectedDistanceMiles: number | null;
+  walkTracks: WalkTrack[];
+  onDropPin: () => void;
+  onQuickLog: () => void;
+  onToggleTrack: () => void;
+  onUseLocation: () => void;
+}) {
+  return (
+    <section className="filter-block field-mode-block" aria-labelledby="field-mode">
+      <div className="section-title">
+        <LocateFixed size={15} />
+        <h2 id="field-mode">Field Mode</h2>
+      </div>
+
+      <div className="field-mode-grid">
+        <button className="sidebar-button sidebar-button-primary" type="button" onClick={onUseLocation} disabled={isLocating}>
+          {isLocating ? <LoaderCircle className="spin" size={15} /> : <LocateFixed size={15} />}
+          Use GPS
+        </button>
+        <button className="sidebar-button sidebar-button-ghost" type="button" onClick={onDropPin} disabled={isLocating}>
+          <MapPinned size={15} />
+          Drop pin
+        </button>
+        <button className={`sidebar-button ${activeTrack ? 'sidebar-button-danger' : 'sidebar-button-ghost'}`} type="button" onClick={onToggleTrack}>
+          <Route size={15} />
+          {activeTrack ? 'Stop walk' : 'Start walk'}
+        </button>
+        <button className="sidebar-button sidebar-button-ghost" type="button" onClick={onQuickLog}>
+          <NotebookPen size={15} />
+          Quick log
+        </button>
+      </div>
+
+      <div className="field-stats" aria-live="polite">
+        <span>
+          <strong>{selectedDistanceMiles === null ? 'GPS needed' : formatMiles(selectedDistanceMiles)}</strong>
+          to selected site
+        </span>
+        <span>
+          <strong>{nearestHotspot ? formatMiles(nearestHotspot.distanceMiles) : 'GPS needed'}</strong>
+          nearest candidate
+        </span>
+        <span>
+          <strong>{nearestPin ? formatMiles(nearestPin.distanceMiles) : `${fieldPins.length}`}</strong>
+          saved pins
+        </span>
+        <span>
+          <strong>{activeTrack ? `${activeTrack.points.length} pts` : `${walkTracks.length}`}</strong>
+          {activeTrack ? `${formatMiles(activeTrackDistance)} walked` : 'saved walks'}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function MobileFieldBar({
+  activeTrack,
+  isLocating,
+  onDropPin,
+  onQuickLog,
+  onToggleTrack,
+  onUseLocation,
+}: {
+  activeTrack: WalkTrack | null;
+  isLocating: boolean;
+  onDropPin: () => void;
+  onQuickLog: () => void;
+  onToggleTrack: () => void;
+  onUseLocation: () => void;
+}) {
+  return (
+    <nav className="mobile-field-bar" aria-label="Field actions">
+      <button type="button" onClick={onUseLocation} disabled={isLocating}>
+        {isLocating ? <LoaderCircle className="spin" size={18} /> : <LocateFixed size={18} />}
+        <span>GPS</span>
+      </button>
+      <button type="button" onClick={onDropPin} disabled={isLocating}>
+        <MapPinned size={18} />
+        <span>Pin</span>
+      </button>
+      <button type="button" onClick={onToggleTrack} className={activeTrack ? 'is-tracking' : ''}>
+        <Route size={18} />
+        <span>{activeTrack ? 'Stop' : 'Walk'}</span>
+      </button>
+      <button type="button" onClick={onQuickLog}>
+        <NotebookPen size={18} />
+        <span>Log</span>
+      </button>
+    </nav>
+  );
+}
+
 function DataStatusPanel({
   customSources,
+  fieldPins,
   logs,
+  providerSettings,
+  walkTracks,
 }: {
   customSources: CustomDataSource[];
+  fieldPins: FieldPin[];
   logs: FieldLog[];
+  providerSettings: MapProviderSettings;
+  walkTracks: WalkTrack[];
 }) {
   const latestLog = logs
     .slice()
@@ -1081,6 +1803,20 @@ function DataStatusPanel({
     : 'No browser field logs yet';
   const sourceRows = [
     ...DATA_SOURCE_STATUS,
+    {
+      name: 'Field pins / walk tracks',
+      status: 'Local',
+      detail: `${fieldPins.length} pins · ${walkTracks.length} saved walks`,
+      tone: 'local' as const,
+    },
+    {
+      name: 'Optional imagery providers',
+      status: [providerSettings.mapboxToken, providerSettings.maptilerKey, providerSettings.customTileUrl].some(Boolean)
+        ? 'Configured'
+        : 'Optional',
+      detail: 'ArcGIS, Mapbox, MapTiler, and custom tile settings live in this browser.',
+      tone: 'custom' as const,
+    },
     ...customSources.slice(0, 3).map<DataSourceStatus>((source) => ({
       name: source.name,
       status: source.type,
@@ -1124,9 +1860,11 @@ function DataStatusPanel({
 
 function DataSettingsPanel({
   draft,
+  providerSettings,
   sources,
   onAdd,
   onChange,
+  onProviderChange,
   onRemove,
 }: {
   draft: {
@@ -1135,6 +1873,7 @@ function DataSettingsPanel({
     url: string;
     notes: string;
   };
+  providerSettings: MapProviderSettings;
   sources: CustomDataSource[];
   onAdd: (event: FormEvent<HTMLFormElement>) => void;
   onChange: React.Dispatch<
@@ -1145,6 +1884,7 @@ function DataSettingsPanel({
       notes: string;
     }>
   >;
+  onProviderChange: React.Dispatch<React.SetStateAction<MapProviderSettings>>;
   onRemove: (id: string) => void;
 }) {
   return (
@@ -1201,6 +1941,8 @@ function DataSettingsPanel({
         </button>
       </form>
 
+      <ProviderSettingsForm settings={providerSettings} onChange={onProviderChange} />
+
       {sources.length > 0 && (
         <div className="custom-source-list">
           {sources.map((source) => {
@@ -1230,6 +1972,178 @@ function DataSettingsPanel({
         </div>
       )}
     </details>
+  );
+}
+
+function ProviderSettingsForm({
+  settings,
+  onChange,
+}: {
+  settings: MapProviderSettings;
+  onChange: React.Dispatch<React.SetStateAction<MapProviderSettings>>;
+}) {
+  const providerRows = [
+    { label: 'ArcGIS World Imagery', configured: true, detail: 'Public imagery layer available without a key.' },
+    { label: 'Mapbox Satellite', configured: Boolean(settings.mapboxToken.trim()), detail: 'Paste a Mapbox access token.' },
+    { label: 'MapTiler Satellite', configured: Boolean(settings.maptilerKey.trim()), detail: 'Paste a MapTiler API key.' },
+    { label: 'Custom imagery URL', configured: Boolean(settings.customTileUrl.trim()), detail: 'XYZ tile template with {z}/{x}/{y}.' },
+  ];
+
+  return (
+    <div className="provider-settings">
+      <div className="provider-heading">
+        <strong>Imagery providers</strong>
+        <span>Keys stay in this browser</span>
+      </div>
+
+      <div className="provider-status-list">
+        {providerRows.map((provider) => (
+          <div key={provider.label} className="provider-status-row">
+            <i className={provider.configured ? 'is-ready' : ''} aria-hidden="true" />
+            <div>
+              <strong>{provider.label}</strong>
+              <span>{provider.detail}</span>
+            </div>
+            <em>{provider.configured ? 'Ready' : 'Setup'}</em>
+          </div>
+        ))}
+      </div>
+
+      <label>
+        ArcGIS API key
+        <input
+          value={settings.arcgisKey}
+          onChange={(event) => onChange((current) => ({ ...current, arcgisKey: event.target.value }))}
+          placeholder="Optional"
+          type="password"
+        />
+      </label>
+      <label>
+        Mapbox token
+        <input
+          value={settings.mapboxToken}
+          onChange={(event) => onChange((current) => ({ ...current, mapboxToken: event.target.value }))}
+          placeholder="pk..."
+          type="password"
+        />
+      </label>
+      <label>
+        MapTiler key
+        <input
+          value={settings.maptilerKey}
+          onChange={(event) => onChange((current) => ({ ...current, maptilerKey: event.target.value }))}
+          placeholder="Optional"
+          type="password"
+        />
+      </label>
+      <label>
+        Custom XYZ tile URL
+        <input
+          value={settings.customTileUrl}
+          onChange={(event) => onChange((current) => ({ ...current, customTileUrl: event.target.value }))}
+          placeholder="https://tiles.example.com/{z}/{x}/{y}.jpg"
+          type="text"
+        />
+      </label>
+      <label>
+        Custom attribution
+        <input
+          value={settings.customAttribution}
+          onChange={(event) => onChange((current) => ({ ...current, customAttribution: event.target.value }))}
+          placeholder="County GIS, state imagery, etc."
+          type="text"
+        />
+      </label>
+      <p>
+        Optional providers may have account, quota, or billing rules. Keep USGS as the field-safe default unless Gwen
+        intentionally configures a provider.
+      </p>
+    </div>
+  );
+}
+
+function FieldNotebookPanel({
+  activeTrack,
+  fieldPins,
+  walkTracks,
+  onRemovePin,
+  onRemoveTrack,
+  onSelectPin,
+}: {
+  activeTrack: WalkTrack | null;
+  fieldPins: FieldPin[];
+  walkTracks: WalkTrack[];
+  onRemovePin: (id: string) => void;
+  onRemoveTrack: (id: string) => void;
+  onSelectPin: (pin: FieldPin) => void;
+}) {
+  return (
+    <section className="field-notebook-panel" aria-label="Field notebook">
+      <div className="panel-heading compact">
+        <div>
+          <p className="eyeline">Field notebook</p>
+          <h2>Pins and walks</h2>
+        </div>
+        <NotebookPen size={18} />
+      </div>
+
+      <div className="field-notebook-summary">
+        <span>
+          <strong>{fieldPins.length}</strong>
+          pins
+        </span>
+        <span>
+          <strong>{walkTracks.length}</strong>
+          walks
+        </span>
+        <span>
+          <strong>{activeTrack ? formatMiles(getTrackDistanceMiles(activeTrack.points)) : 'off'}</strong>
+          tracking
+        </span>
+      </div>
+
+      {activeTrack && (
+        <article className="field-record is-active">
+          <div>
+            <strong>{activeTrack.label}</strong>
+            <span>{activeTrack.points.length} GPS points · {formatMiles(getTrackDistanceMiles(activeTrack.points))}</span>
+          </div>
+          <em>Live</em>
+        </article>
+      )}
+
+      <div className="field-record-list">
+        {fieldPins.slice(0, 5).map((pin) => (
+          <article key={pin.id} className="field-record">
+            <button type="button" onClick={() => onSelectPin(pin)}>
+              <strong>{pin.label}</strong>
+              <span>
+                {pin.materialGuess} · {formatDate(pin.createdAt)} · {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
+              </span>
+            </button>
+            <button type="button" aria-label={`Remove ${pin.label}`} onClick={() => onRemovePin(pin.id)}>
+              <Trash2 size={14} />
+            </button>
+          </article>
+        ))}
+
+        {walkTracks.slice(0, 4).map((track) => (
+          <article key={track.id} className="field-record">
+            <div>
+              <strong>{track.label}</strong>
+              <span>{formatMiles(track.distanceMiles)} · {track.points.length} GPS points</span>
+            </div>
+            <button type="button" aria-label={`Remove ${track.label}`} onClick={() => onRemoveTrack(track.id)}>
+              <Trash2 size={14} />
+            </button>
+          </article>
+        ))}
+      </div>
+
+      {!fieldPins.length && !walkTracks.length && !activeTrack && (
+        <p className="empty-state">No field pins or walks yet. Use GPS, drop a pin, or start a walk from the mobile field bar.</p>
+      )}
+    </section>
   );
 }
 
@@ -1288,6 +2202,75 @@ function setLayerVisibility(map: MapLibreMap, layerIds: string[], visible: boole
   });
 }
 
+function optionalBasemapTiles(id: BasemapId, settings: MapProviderSettings): string[] | null {
+  if (id === 'arcgis') {
+    const token = settings.arcgisKey.trim();
+    return [
+      `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+    ];
+  }
+  if (id === 'mapbox' && settings.mapboxToken.trim()) {
+    return [
+      `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=${encodeURIComponent(settings.mapboxToken.trim())}`,
+    ];
+  }
+  if (id === 'maptiler' && settings.maptilerKey.trim()) {
+    return [
+      `https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${encodeURIComponent(settings.maptilerKey.trim())}`,
+    ];
+  }
+  if (id === 'custom' && settings.customTileUrl.trim()) {
+    return [settings.customTileUrl.trim()];
+  }
+
+  return null;
+}
+
+function optionalBasemapAttribution(id: BasemapId, settings: MapProviderSettings) {
+  if (id === 'arcgis') return 'Esri, Maxar, Earthstar Geographics, and contributors';
+  if (id === 'mapbox') return 'Mapbox satellite imagery';
+  if (id === 'maptiler') return 'MapTiler satellite imagery';
+  if (id === 'custom') return settings.customAttribution.trim() || 'Custom imagery layer';
+  return '';
+}
+
+function syncOptionalBasemapLayer(map: MapLibreMap, option: BasemapOption, settings: MapProviderSettings) {
+  const tiles = optionalBasemapTiles(option.id, settings);
+
+  if (map.getLayer(option.layerId)) {
+    map.removeLayer(option.layerId);
+  }
+  if (map.getSource(option.layerId)) {
+    map.removeSource(option.layerId);
+  }
+
+  if (!tiles) return;
+
+  map.addSource(option.layerId, {
+    type: 'raster',
+    tiles,
+    tileSize: 256,
+    maxzoom: option.nativeZoom,
+    attribution: optionalBasemapAttribution(option.id, settings),
+  });
+  map.addLayer(
+    {
+      id: option.layerId,
+      type: 'raster',
+      source: option.layerId,
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'raster-contrast': -0.04,
+        'raster-brightness-min': 0.03,
+        'raster-brightness-max': 0.96,
+      },
+    },
+    map.getLayer('wyoming-frame-fill') ? 'wyoming-frame-fill' : undefined,
+  );
+}
+
 function wyomingFrameData(): MapFeatureCollection {
   return featureCollection([
     {
@@ -1317,6 +2300,54 @@ function routeLineData(): MapFeatureCollection {
       properties: { id: `research-route-${index + 1}` },
     })),
   );
+}
+
+function fieldPinsData(pins: FieldPin[]): MapFeatureCollection {
+  return featureCollection(
+    pins.map((pin) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [pin.lng, pin.lat] },
+      properties: {
+        id: pin.id,
+        label: pin.label,
+        materialGuess: pin.materialGuess,
+        returnWorthy: pin.returnWorthy,
+      },
+    })),
+  );
+}
+
+function walkTracksData(walkTracks: WalkTrack[], activeTrack: WalkTrack | null): MapFeatureCollection {
+  const savedFeatures = walkTracks
+    .filter((track) => track.points.length > 1)
+    .map<MapFeature>((track) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: track.points.map((point) => [point.lng, point.lat]) },
+      properties: {
+        id: track.id,
+        active: false,
+        label: track.label,
+      },
+    }));
+  const activeFeature =
+    activeTrack && activeTrack.points.length > 1
+      ? [
+          {
+            type: 'Feature' as const,
+            geometry: {
+              type: 'LineString' as const,
+              coordinates: activeTrack.points.map((point) => [point.lng, point.lat]),
+            },
+            properties: {
+              id: activeTrack.id,
+              active: true,
+              label: activeTrack.label,
+            },
+          },
+        ]
+      : [];
+
+  return featureCollection([...savedFeatures, ...activeFeature]);
 }
 
 function radiusAreaData(location: UserLocation | null, radiusMiles: number): MapFeatureCollection {
@@ -1373,19 +2404,27 @@ function radiusFitMaxZoom(radiusMiles: number) {
 
 function WyomingMap({
   activeBasemap,
+  activeTrack,
+  fieldPins,
   filteredHotspots,
   layers,
+  providerSettings,
   selectedId,
   userLocation,
   searchRadiusMiles,
+  walkTracks,
   onSelect,
 }: {
   activeBasemap: BasemapId;
+  activeTrack: WalkTrack | null;
+  fieldPins: FieldPin[];
   filteredHotspots: Hotspot[];
   layers: LayerToggleState;
+  providerSettings: MapProviderSettings;
   selectedId: string;
   userLocation: UserLocation | null;
   searchRadiusMiles: number;
+  walkTracks: WalkTrack[];
   onSelect: (id: string) => void;
 }) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
@@ -1401,7 +2440,8 @@ function WyomingMap({
     [selectedId],
   );
   const activeBasemapOption =
-    BASEMAP_OPTIONS.find((option) => option.id === activeBasemap) ?? BASEMAP_OPTIONS[0];
+    getAvailableBasemaps(providerSettings).find((option) => option.id === activeBasemap && isBasemapConfigured(option)) ??
+    BUILT_IN_BASEMAP_OPTIONS[0];
 
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return;
@@ -1525,6 +2565,32 @@ function WyomingMap({
         },
       });
 
+      map.addSource('walk-tracks', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'walk-tracks',
+        type: 'line',
+        source: 'walk-tracks',
+        paint: {
+          'line-color': ['case', ['==', ['get', 'active'], true], '#cf7b48', '#45738f'],
+          'line-opacity': ['case', ['==', ['get', 'active'], true], 0.88, 0.62],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 12, 5.5],
+        },
+      });
+
+      map.addSource('field-pins', { type: 'geojson', data: featureCollection() });
+      map.addLayer({
+        id: 'field-pins',
+        type: 'circle',
+        source: 'field-pins',
+        paint: {
+          'circle-color': ['case', ['==', ['get', 'returnWorthy'], true], '#cf7b48', '#45738f'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 6, 12, 12],
+          'circle-stroke-color': '#fffaf1',
+          'circle-stroke-width': 2.4,
+          'circle-opacity': 0.95,
+        },
+      });
+
       mapReadyRef.current = true;
       setMapReady(true);
       map.resize();
@@ -1546,11 +2612,12 @@ function WyomingMap({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
+    OPTIONAL_BASEMAP_OPTIONS.forEach((option) => syncOptionalBasemapLayer(map, option, providerSettings));
     BASEMAP_LAYER_IDS.forEach((layerId) => {
       if (!map.getLayer(layerId)) return;
       map.setLayoutProperty(layerId, 'visibility', layerId === activeBasemapOption.layerId ? 'visible' : 'none');
     });
-  }, [activeBasemapOption.layerId, mapReady]);
+  }, [activeBasemapOption.layerId, mapReady, providerSettings]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1596,6 +2663,14 @@ function WyomingMap({
     setLayerVisibility(map, ['claim-signal'], layers.claims);
     setLayerVisibility(map, ['research-routes'], layers.roads);
   }, [filteredHotspots, layers, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    setSourceData(map, 'field-pins', fieldPinsData(fieldPins));
+    setSourceData(map, 'walk-tracks', walkTracksData(walkTracks, activeTrack));
+  }, [activeTrack, fieldPins, mapReady, walkTracks]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1682,11 +2757,13 @@ function WyomingMap({
 function Inspector({
   hotspot,
   score,
+  selectedDistanceMiles,
   logs,
   onOpenLog,
 }: {
   hotspot: Hotspot;
   score: number;
+  selectedDistanceMiles: number | null;
   logs: FieldLog[];
   onOpenLog: () => void;
 }) {
@@ -1711,6 +2788,16 @@ function Inspector({
           <span key={material}>{material}</span>
         ))}
       </div>
+
+      {selectedDistanceMiles !== null && (
+        <div className="distance-card">
+          <Navigation size={17} />
+          <div>
+            <span>Distance from your location</span>
+            <strong>{formatMiles(selectedDistanceMiles)} to selected candidate</strong>
+          </div>
+        </div>
+      )}
 
       <div className="detail-stack">
         <DetailRow icon={<Mountain size={16} />} label="Geology" value={hotspot.geologyUnit} />
